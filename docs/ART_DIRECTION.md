@@ -121,9 +121,37 @@ Isolated on a perfectly flat pure magenta (#FF00FF) background, nothing touching
 Variante con mascotas: reemplazar "a white star and a lightning bolt" por
 "a cartoon mascot: a bull (red), a shark (blue), a bee (yellow), a frog (green)".
 
-## Pipeline (cuando llegan las imágenes)
+## Pipeline
 
-1. Recorte del fondo croma y limpieza del borde verde/magenta.
-2. Separación de piezas por regiones, recorte y escalado a la medida del juego.
-3. Pivotes del rig (hombro, cadera, cuello) definidos por pieza.
-4. Export a `public/game/` y carga con `loadSprite` en KAPLAY.
+Las hojas originales viven en `art/source/` con el nombre de cada prompt
+(`personaje-piezas.jpg`, `props.jpg`…). Para regenerar los sprites:
+
+```bash
+python3 scripts/process_art.py   # requiere Pillow y numpy
+```
+
+El script:
+
+1. Quita el fondo croma con alpha suave y des-mezcla el borde (sin halo verde).
+2. Corta cada objeto según las cajas de `CONFIG`, lo recorta al contenido y lo escala.
+   Las piezas del personaje comparten escala para conservar sus proporciones.
+3. En el torso y la manga separa la tela blanca en una capa `-tint` que el juego
+   multiplica por el color del equipo.
+4. Escribe `public/game/sprites/` (juego), `public/ui/` (React) y el manifiesto
+   `src/game/assets/manifest.ts` con el tamaño de cada sprite.
+
+Si se regenera una hoja con otro layout, hay que ajustar sus cajas en `CONFIG`. Las
+articulaciones del rig (cuello, hombro, cadera) están en `src/game/engine/contestant.ts`.
+
+## Estado
+
+| Asset | Estado |
+|---|---|
+| Personaje (piezas y referencia) | Integrado: rig en el juego y concursante en la portada |
+| Objetos (rodillo, bumper, arco, pilar, agua) | Integrado |
+| Efectos | Integrado (carteles, salpicón, polvo, estrellas, burbujas, confeti) |
+| Escudos | Integrado en la UI (selector, HUD, resultados) |
+| Fondo del estudio | Pendiente: falta `art/source/fondo-estudio.jpg` (el código ya lo usa si existe) |
+| Tramo del puente | Pendiente: falta `art/source/puente-tramo.jpg` (el código ya lo usa si existe) |
+| Logo | Pendiente: falta `art/source/logo.jpg`; mientras tanto el título usa la fuente |
+| Fuente | Luckiest Guy (Apache 2.0) en `public/game/fonts/` y vía `next/font` |

@@ -43,14 +43,18 @@ supermatch/
 │   ├── components/
 │   │   ├── ui/                       # (pendiente) Exportados de Figma
 │   │   ├── hud/Hud.tsx               # Overlay React sobre el canvas
-│   │   └── TeamPicker.tsx
+│   │   └── TeamPicker.tsx            # Tarjetas con escudo por equipo
 │   │
 │   ├── game/                         # Mundo KAPLAY. TS puro.
 │   │   ├── contract.ts               # GameEvent (juego→UI), GameCommand (UI→juego), GameHandle
+│   │   ├── assets/
+│   │   │   ├── manifest.ts           # Generado por scripts/process_art.py
+│   │   │   └── index.ts              # loadAssets(): sprites + fuente
 │   │   ├── engine/
 │   │   │   ├── createGame.ts         # Crea/destruye la instancia de KAPLAY
 │   │   │   ├── physics.ts            # Helpers puros: approach, spring, colisiones
-│   │   │   └── fx.ts                 # Partículas y carteles ("¡BOING!")
+│   │   │   ├── contestant.ts         # Rig del concursante (títere de cartón)
+│   │   │   └── fx.ts                 # Partículas, carteles y destellos
 │   │   └── scenes/
 │   │       └── slippery-bridge/      # Minijuego 1: El Puente Resbaladizo
 │   │           ├── tuning.ts         # Todas las perillas de feel
@@ -67,9 +71,13 @@ supermatch/
 │   ├── store/session.ts              # Zustand: facción, resultados, puntaje en vivo, playlist
 │   └── lib/
 │       ├── teams.ts                  # Facciones (espejo de public.teams)
+│       ├── minigames.ts              # Nombres de los minijuegos para la UI
 │       └── supabase/                 # (pendiente)
 │
-├── public/game/                      # (pendiente) Sprites y SFX
+├── art/source/                       # Hojas originales generadas (fuente de verdad del arte)
+├── scripts/process_art.py            # Hojas → sprites recortados + manifiesto
+├── public/game/                      # Sprites y fuente del juego
+├── public/ui/                        # Imágenes de la UI (escudos, concursante)
 ├── supabase/migrations/              # Esquema versionado (fuente de verdad)
 └── docs/
 ```
@@ -156,8 +164,14 @@ migración nueva.
   `fixed: true` (útil para overlays).
 - Para dibujar por escena se usa un game object con `draw()`: se destruye solo al cambiar
   de escena.
-- `outline` en `drawText` se ignora (el contorno de texto se define al cargar la fuente):
-  para carteles legibles se dibuja una sombra desplazada.
+- El contorno del texto se define al cargar la fuente (`loadFont(…, { outline })`);
+  el `outline` de `drawText` se ignora.
+- `drawSprite` rota alrededor del punto `anchor` (un `Vec2` de -1 a 1), así que cada
+  pieza del rig se ancla en su articulación. Con solo `width`, conserva la proporción.
+- Las texturas que se repiten (puente, agua) se dibujan alineadas al mundo, espejando
+  una de cada dos copias y recortando con `quad` en los bordes.
+- La cámara usa zoom (`setCamScale`); los overlays van con `fixed: true` y no se ven
+  afectados.
 
 **Anti-trampas**
 - Cualquier puntaje que calcula el cliente se puede falsificar. Las RPCs ponen topes de

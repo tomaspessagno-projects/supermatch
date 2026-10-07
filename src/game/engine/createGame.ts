@@ -1,4 +1,5 @@
 import kaplay from "kaplay";
+import { loadAssets } from "../assets";
 import type {
   GameCommand,
   GameEvent,
@@ -42,6 +43,7 @@ export function createGame({
     background: "#1a1033",
   });
 
+  loadAssets(k);
   registerSlipperyBridge(k, { teamColor, emit });
 
   return {

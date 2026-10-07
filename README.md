@@ -14,6 +14,7 @@ npm run dev      # http://localhost:3000
 npm run lint     # incluye las fronteras React ⇄ KAPLAY
 npm test         # física y reglas de los minijuegos (sin navegador)
 npm run build
+python3 scripts/process_art.py   # regenera los sprites desde art/source/
 ```
 
 ## Docs

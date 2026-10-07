@@ -1,40 +1,47 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { MINIGAME_NAMES } from "@/lib/minigames";
+import { getTeam } from "@/lib/teams";
 import { useSession } from "@/store/session";
 
 export function ResultsSummary() {
+  const team = useSession((s) => s.team);
   const results = useSession((s) => s.results);
   const total = results.reduce((sum, r) => sum + r.score, 0);
 
-  if (results.length === 0) {
+  if (results.length === 0 || !team) {
     return (
-      <Link href="/" className="underline">
-        Todavía no jugaste. Elegí tu equipo.
+      <Link href="/" className="btn-chunky bg-sun px-6 py-3 font-display text-xl text-ink">
+        Elegí tu equipo y jugá
       </Link>
     );
   }
 
   return (
-    <div className="flex w-full max-w-sm flex-col gap-6">
-      <ol className="flex flex-col gap-2 font-mono" data-testid="results">
+    <div className="flex w-full max-w-md flex-col gap-6 rounded-3xl border-4 border-ink bg-ink/60 p-6">
+      <div className="flex items-center gap-3">
+        <Image src={`/ui/badge-${team}.png`} alt="" width={186} height={186} className="size-12" />
+        <p className="text-cartoon text-2xl text-white">Sumás para {getTeam(team).name}</p>
+      </div>
+      <ol className="flex flex-col gap-2" data-testid="results">
         {results.map((r) => (
-          <li key={r.slot} className="flex justify-between">
-            <span>
-              {r.slot}. {r.minigameId}
+          <li key={r.slot} className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-2">
+            <span className="text-foreground/80">
+              {r.slot}. {MINIGAME_NAMES[r.minigameId]}
             </span>
-            <span>{r.score}</span>
+            <span className="font-display text-xl tabular-nums">{r.score}</span>
           </li>
         ))}
       </ol>
-      <p className="flex justify-between border-t pt-4 text-2xl font-bold">
-        <span>Total</span>
-        <span data-testid="results-total">{total}</span>
+      <p className="flex items-baseline justify-between border-t-4 border-dashed border-white/15 pt-4">
+        <span className="text-cartoon text-3xl text-white">TOTAL</span>
+        <span data-testid="results-total" className="text-cartoon text-5xl text-sun tabular-nums">
+          {total}
+        </span>
       </p>
-      <Link
-        href="/play"
-        className="rounded-2xl bg-white px-4 py-3 text-center font-bold text-black"
-      >
+      <Link href="/play" className="btn-chunky bg-sun px-4 py-3 text-center font-display text-2xl text-ink">
         Jugar de nuevo
       </Link>
     </div>
