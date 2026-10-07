@@ -6,7 +6,7 @@
  */
 
 /** Debe coincidir con public.minigames.id */
-export type MinigameId = "slippery_bridge";
+export type MinigameId = "slippery_bridge" | "rolling_log";
 
 export type RunSlot = 1 | 2 | 3;
 

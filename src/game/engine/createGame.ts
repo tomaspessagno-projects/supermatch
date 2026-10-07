@@ -7,6 +7,7 @@ import type {
   MinigameId,
   TeamInfo,
 } from "../contract";
+import { registerRollingLog, ROLLING_LOG_SCENE } from "../scenes/rolling-log";
 import {
   registerSlipperyBridge,
   SLIPPERY_BRIDGE_SCENE,
@@ -19,6 +20,7 @@ const GAME_HEIGHT = 720;
 
 const SCENE_BY_MINIGAME: Record<MinigameId, string> = {
   slippery_bridge: SLIPPERY_BRIDGE_SCENE,
+  rolling_log: ROLLING_LOG_SCENE,
 };
 
 export type CreateGameOptions = {
@@ -73,6 +75,7 @@ export function createGame({
   loadAssets(k);
   loadSounds(k);
   registerSlipperyBridge(k, ctx);
+  registerRollingLog(k, ctx);
 
   return {
     send(command: GameCommand) {

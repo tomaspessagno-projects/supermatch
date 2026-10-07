@@ -9,10 +9,10 @@ import type {
 import * as api from "@/lib/supabase/api";
 import type { TeamId } from "@/lib/teams";
 
-/** Orden de los 3 minijuegos de un run. Por ahora existe uno solo. */
+/** Orden de los 3 minijuegos de un run. La tercera será Baldes al Tanque. */
 export const RUN_PLAYLIST: readonly MinigameId[] = [
   "slippery_bridge",
-  "slippery_bridge",
+  "rolling_log",
   "slippery_bridge",
 ];
 

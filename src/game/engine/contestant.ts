@@ -35,8 +35,10 @@ export type ContestantPose = {
   /** Centro de los pies. */
   x: number;
   y: number;
-  /** Inclinación del cuerpo en grados (positivo = hacia adelante). */
+  /** Inclinación del cuerpo en grados (positivo = horario, hacia la derecha). */
   lean: number;
+  /** Hacia dónde mira: 1 derecha (por defecto), -1 izquierda. */
+  facing?: 1 | -1;
   /** 1 = normal, < 1 aplastado, > 1 estirado. */
   squash: number;
   /** Grados por pierna [atrás, adelante]; 0 = recta, positivo = pie hacia adelante. */
@@ -100,9 +102,11 @@ export function createContestant(k: KAPLAYCtx, teamColor: string) {
 
     k.pushTransform();
     k.pushTranslate(pose.x, pose.y);
-    k.pushScale((2 - pose.squash) * VISUAL_SCALE, pose.squash * VISUAL_SCALE);
+    const facing = pose.facing ?? 1;
+    k.pushScale(facing * (2 - pose.squash) * VISUAL_SCALE, pose.squash * VISUAL_SCALE);
     k.pushTranslate(0, hipY / VISUAL_SCALE);
-    k.pushRotate(pose.lean);
+    // Espejado, la rotación se invierte: así la inclinación queda igual en pantalla.
+    k.pushRotate(facing * pose.lean);
 
     arm(pose.arms[0], true);
     leg(pose.legs[0], true);

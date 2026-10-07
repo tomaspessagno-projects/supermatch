@@ -47,6 +47,7 @@ supermatch/
 │   │   │   └── TouchControls.tsx     # ◀ ▶ ⤒ en pantallas táctiles + "girá el celular"
 │   │   ├── episode/
 │   │   │   ├── EpisodeOverlay.tsx    # Presentación, 3-2-1, "¡YA!", tabla entre pruebas
+│   │   │   ├── Host.tsx              # El presentador: cabeza que habla + globo
 │   │   │   └── TeamRow.tsx           # Fila de tabla de equipos (episodio y resultados)
 │   │   └── TeamPicker.tsx            # Tarjetas con escudo por equipo
 │   │
@@ -59,18 +60,21 @@ supermatch/
 │   │   │   ├── createGame.ts         # Crea/destruye la instancia de KAPLAY
 │   │   │   ├── scene.ts              # SceneContext: lo que recibe cada minijuego
 │   │   │   ├── audio.ts              # Efectos, música en loop, silencio
+│   │   │   ├── animator.ts           # Animación de un concursante (cualquier prueba)
+│   │   │   ├── referee.ts            # El árbitro: silbato, tarjeta roja, bandera
+│   │   │   ├── random.ts             # Aleatorio con semilla (bots)
 │   │   │   ├── physics.ts            # Helpers puros: approach, spring, colisiones
 │   │   │   ├── contestant.ts         # Rig del concursante (títere de cartón)
 │   │   │   └── fx.ts                 # Partículas, carteles y destellos
 │   │   └── scenes/
-│   │       └── slippery-bridge/      # Minijuego 1: El Puente Resbaladizo
+│   │       ├── rolling-log/          # El Tronco Loco (mismos archivos que el Puente)
+│   │       └── slippery-bridge/      # El Puente Resbaladizo
 │   │           ├── tuning.ts         # Todas las perillas de feel
 │   │           ├── level.ts          # Layout fijo (charcos, rodillos, meta)
 │   │           ├── sim.ts            # Simulación pura: step(world, input, dt)
 │   │           ├── sim.test.ts       # El feel y las reglas, como tests
 │   │           ├── bot.ts            # Rivales: planificador + errores humanos por nivel
 │   │           ├── bot.test.ts       # Calibración: que se les pueda ganar
-│   │           ├── animator.ts       # Animación de un concursante (jugador o rival)
 │   │           ├── render.ts         # Dibuja el estado (cámara, ragdoll, rivales, efectos)
 │   │           └── index.ts          # Escena KAPLAY: input + paso fijo + render
 │   │
@@ -83,6 +87,7 @@ supermatch/
 │   └── lib/
 │       ├── teams.ts                  # Facciones (espejo de public.teams)
 │       ├── minigames.ts              # Nombre, regla y controles de cada prueba
+│       ├── host.ts                   # Lo que dice el presentador
 │       ├── nicknames.ts              # Apodo al azar ("Pato Resbaloso")
 │       └── supabase/
 │           ├── client.ts             # Cliente del navegador (URL + publishable key)
@@ -167,6 +172,14 @@ Cada minijuego separa **qué pasa** de **cómo se ve**:
 Así el feel se puede testear sin navegador, el resultado no depende de los FPS del
 jugador y, más adelante, una partida se podría re-simular en el servidor a partir del
 input grabado.
+
+Cada minijuego tiene además su `bot.ts` (los rivales, que corren la misma simulación)
+y su `tuning.ts` con `SERVER_LIMITS`, el espejo de su fila en `public.minigames`.
+
+**Agregar un minijuego:** carpeta en `scenes/` con esos archivos, su id en
+`MinigameId` (`contract.ts`), registrarlo en `createGame.ts`, nombre/regla/controles
+en `lib/minigames.ts`, una frase en `lib/host.ts` y una migración que lo inserte en
+`public.minigames`.
 
 ### Cómo ajustar el feel
 

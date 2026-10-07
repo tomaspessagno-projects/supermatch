@@ -17,6 +17,14 @@ export const MINIGAMES: Record<MinigameId, MinigameInfo> = {
       { keys: "ESPACIO", touch: "⤒", action: "saltar" },
     ],
   },
+  rolling_log: {
+    name: "El Tronco Loco",
+    rule: "Quedate arriba del tronco que gira: corré en contra, saltá las pelotas bajas (las altas, no) y reventá las burbujas doradas. Tenés 3 vidas.",
+    controls: [
+      { keys: "← →", touch: "◀ ▶", action: "correr" },
+      { keys: "ESPACIO", touch: "⤒", action: "saltar" },
+    ],
+  },
 };
 
 export const MINIGAME_NAMES: Record<MinigameId, string> = Object.fromEntries(

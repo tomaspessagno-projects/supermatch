@@ -363,6 +363,21 @@ Confetti cannons fire over a finish arch in a colorful TV game-show studio, stat
 A cartoon contestant sits soaking wet and sad on a slippery bridge, static camera. Audio: a comedic sad trombone "wah wah wah waaah", the last note long and wobbly, then silence. No voices, no crowd.
 ```
 
+#### cannon.mp4 — cañonazo de espuma (El Tronco Loco)
+```
+A pink cartoon cannon fires a big soft foam ball, side view, static camera, plain flat green background. Audio: one short comedic "pomf" cannon shot, a deep soft thump with a puff of air, then silence. No music, no voices.
+```
+
+#### creak.mp4 — el tronco cruje antes de cambiar de giro
+```
+Close-up of a giant wooden log slowly turning in a TV game-show pool, static camera. Audio: one loud, dramatic wooden creak, like an old ship's mast straining, about one second, then silence. No music, no voices.
+```
+
+#### pop.mp4 — burbuja dorada que revienta
+```
+A shiny golden soap bubble bursts with sparkles, close-up, static camera, plain dark background. Audio: one bright, short bubble "pop" followed by a tiny magical sparkle chime, then silence. No music, no voices.
+```
+
 #### cheer.mp4 — el público festeja
 ```
 A TV studio audience in bleachers jumps and cheers under colorful spotlights, wide static shot. Audio: a live studio audience cheering, clapping and whistling enthusiastically for about three seconds, then fading out. No music, no announcer, no recognizable words.
@@ -412,7 +427,9 @@ El script:
 4. Escribe `public/game/sprites/` (juego), `public/ui/` (React) y el manifiesto
    `src/game/assets/manifest.ts` con el tamaño de cada sprite.
 
-Si se regenera una hoja con otro layout, hay que ajustar sus cajas en `CONFIG`. Las
+Si se regenera una hoja con otro layout, hay que ajustar sus cajas en `CONFIG`. Cuando
+dos piezas se tocan (como las cabezas del presentador), el modo `seed` se queda con la
+de arriba siguiendo el contorno oscuro. Las
 articulaciones del rig (cuello, hombro, cadera) están en `src/game/engine/contestant.ts`.
 
 ## Estado
@@ -427,6 +444,10 @@ articulaciones del rig (cuello, hombro, cadera) están en `src/game/engine/conte
 | Tramo del puente | Integrado: textura repetida y recortada en cada charco |
 | Logo | Integrado en la portada |
 | Fuente | Luckiest Guy (Apache 2.0) en `public/game/fonts/` y vía `next/font` |
-| Sonido | Placeholders sintetizados integrados (12 efectos + música); esperando los de Flow |
+| Sonido | Placeholders sintetizados integrados (15 efectos + música); esperando los de Flow |
 | Música de portada y jingle ganador | Pedidos (`menu`, `win`); se integran cuando lleguen |
-| Pruebas nuevas, presentador/a y árbitro | Pedidos (prompts de arriba) |
+| El Tronco Loco (`props-tronco`) | Integrado: tronco, soporte, cañones, pelotas, burbujas |
+| Puente v2 (`props-puente-v2`) | Recortado; ya se usan las banderas. El resto entra con la Fase 2.3 |
+| Presentador/a | Integrado: cabeza que habla en presentación, tabla y resultados |
+| Árbitro | Integrado: silbato en la largada y la cuenta, tarjeta roja, bandera al final |
+| Baldes al Tanque (`props-baldes`) | Falta |

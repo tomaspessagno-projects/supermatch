@@ -1,9 +1,10 @@
 import type { KAPLAYCtx } from "kaplay";
 import { FONT, hasSprite, SPRITES, type SpriteName } from "../../assets";
+import { createAnimator } from "../../engine/animator";
 import { createContestant } from "../../engine/contestant";
 import { createFx } from "../../engine/fx";
 import { clamp } from "../../engine/physics";
-import { createAnimator } from "./animator";
+import { createReferee } from "../../engine/referee";
 import { puddleAt, rollerCenterY } from "./level";
 import type { SimEvent, World } from "./sim";
 import { TUNING } from "./tuning";
@@ -28,6 +29,7 @@ const DECK_THICKNESS = 36; // del riel al borde inferior del panel
 const POOL_Y = 60; // nivel del agua de la pileta, bajo el piso
 const RIVAL_OPACITY = 0.55;
 const RIVAL_Y = -10; // un poco más atrás en el puente
+const REFEREE_START_X = 92;
 
 /**
  * Dibuja el Puente a partir del estado de la simulación. Solo guarda estado
@@ -48,6 +50,7 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
     danger: k.rgb("#f87171"),
   };
   const fx = createFx(k, FONT);
+  const referee = createReferee(k);
   const player = { look: createContestant(k, teamColor), anim: createAnimator() };
   const rivals = rivalColors.map((color) => ({
     color: k.rgb(color),
@@ -85,12 +88,17 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
           k.shake(14);
           break;
         case "splash":
+          referee.card();
           fx.flash("fx-splash", e.x, floor + 40, { anchor: "bot", from: 0.5, to: 1.1, life: 0.8 });
           fx.burst({ x: e.x, y: floor + 14, count: 24, speed: 700, colors: [c.water, c.white, c.deckEdge], size: 14, spread: 70, life: 0.9 });
           fx.popup("¡PLAF!", e.x, floor - 170, c.water, { size: 56 });
           k.shake(8);
           break;
+        case "timeout":
+          referee.end();
+          break;
         case "finish":
+          referee.end();
           fx.burst({ x: p.x, y: p.y - 120, count: 60, speed: 650, sprites: CONFETTI, size: 18, spread: 150, life: 1.8, gravity: 500 });
           break;
         case "checkpoint":
@@ -120,10 +128,11 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
   function update(dt: number, world: World, rivalWorlds: readonly World[], move: number) {
     const p = world.player;
     fx.update(dt);
-    player.anim.update(dt, world, move);
+    referee.update(dt);
+    player.anim.update(dt, world.player, move);
     rivalWorlds.forEach((w, i) => {
       const vx = w.player.vx;
-      rivals[i]?.anim.update(dt, w, Math.abs(vx) > 40 ? Math.sign(vx) : 0);
+      rivals[i]?.anim.update(dt, w.player, Math.abs(vx) > 40 ? Math.sign(vx) : 0);
     });
 
     const minCam = world.level.wallX - 60 + HALF_VIEW;
@@ -143,9 +152,12 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
     drawPool(world, left, right);
     drawBridge(world);
     drawFlags(world);
+    // El árbitro: da la largada y espera en la meta mirando para atrás.
+    referee.draw(REFEREE_START_X, world.level.floorY + 4, 84);
+    referee.draw(world.level.finishX + 190, world.level.floorY + 4, 92, { flip: true });
     drawRivals(rivalWorlds, left, right);
     drawShadow(world);
-    if (world.respawnIn === 0) player.look.draw(player.anim.pose(world));
+    if (world.respawnIn === 0) player.look.draw(player.anim.pose(world.player, world.time));
     drawPuddleWater(world);
     drawRollers(world, left, right);
     fx.draw();
@@ -157,7 +169,7 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
       const rival = rivals[i];
       const p = w.player;
       if (!rival || w.respawnIn > 0 || p.x < left || p.x > right) return;
-      rival.look.draw(rival.anim.pose(w, RIVAL_Y, RIVAL_OPACITY));
+      rival.look.draw(rival.anim.pose(w.player, w.time, { yOffset: RIVAL_Y, opacity: RIVAL_OPACITY }));
       // Marcador del equipo sobre la cabeza.
       k.drawCircle({ pos: k.vec2(p.x, p.y + RIVAL_Y - 132), radius: 7, color: rival.color, outline: { width: 3, color: c.ink }, opacity: 0.9 });
     });
@@ -166,7 +178,19 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
   function drawFlags(world: World) {
     const { floorY, checkpoints } = world.level;
     for (const x of checkpoints.slice(1)) {
+      // Blanca hasta que la pasás; después, del color de tu equipo.
       const reached = world.checkpoint >= x;
+      if (hasSprite("prop-flag")) {
+        k.drawSprite({
+          sprite: "prop-flag",
+          pos: k.vec2(x, floorY + 4),
+          anchor: "bot",
+          height: 120,
+          color: reached ? c.team : c.white,
+          angle: Math.sin(world.time * 3 + x) * 2,
+        });
+        continue;
+      }
       k.drawLine({ p1: k.vec2(x, floorY + 2), p2: k.vec2(x, floorY - 110), width: 5, color: c.ink });
       const top = floorY - 108;
       const wave = Math.sin(world.time * 6 + x) * 4;
@@ -303,6 +327,7 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
     const { startX, finishX, puddles, rollers } = world.level;
     const track = { x: 440, y: 30, w: 400 };
     const toTrack = (x: number) => track.x + clamp((x - startX) / (finishX - startX), 0, 1) * track.w;
+    referee.drawCardInset(VIEW_H);
 
     k.drawRect({ pos: k.vec2(track.x - 10, track.y - 9), width: track.w + 20, height: 18, radius: 9, color: c.ink, opacity: 0.6, fixed: true });
     for (const p of puddles) {

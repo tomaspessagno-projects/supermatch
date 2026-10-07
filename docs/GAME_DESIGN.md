@@ -211,15 +211,21 @@ sonido usa placeholders sintetizados hasta que lleguen los audios de Flow.
 
 | # | Entregable | Tamaño | Arte de Flow |
 |---|---|---|---|
-| 2.1 | Baldes al Tanque (simulación, nivel, render, tests, bot) | L | Hoja `props-baldes` |
-| 2.2 | El Tronco Loco | L | Hoja `props-tronco` |
-| 2.3 | Puente v2: trampolín, cinta, martillo, cañón, pompas, banderas | M | Hoja `props-puente-v2` |
+| 2.1 | Baldes al Tanque (simulación, nivel, render, tests, bot) | L | Hoja `props-baldes` (falta) |
+| 2.2 | El Tronco Loco ✅ | L | Hoja `props-tronco` |
+| 2.3 | Puente v2: trampolín, cinta, martillo, cañón, pompas, banderas | M | Hoja `props-puente-v2` (llegó; ya se usan las banderas) |
+
+**El Tronco Loco quedó así:** arranca quieto y el primer crujido enseña que cada
+cambio de giro se avisa un segundo antes. Los cañones están a dos alturas: la pelota
+baja se salta; la alta te pasa por arriba si no saltás. Bots calibrados (12
+partidas): as ≈ 820, promedio ≈ 700, torpe ≈ 380. Un jugador perfecto saca ≈ 985.
+Mientras falta Baldes al Tanque, el episodio es Puente → Tronco → Puente.
 
 ### Fase 3 — "Personajes"
 
 | # | Entregable | Tamaño | Arte de Flow |
 |---|---|---|---|
-| 3.1 | Presentador/a y árbitro | M | Hoja de cada uno + boca abierta/cerrada |
+| 3.1 | Presentador/a y árbitro ✅ | M | Hoja de cada uno + boca abierta/cerrada |
 | 3.2 | Concursante animado por clips de video | L | Clips ya pedidos (correr, patinar, golpe…) |
 | 3.3 | 4 concursantes elegibles / disfraces | L | Hojas de personaje + clips |
 

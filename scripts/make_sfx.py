@@ -10,6 +10,7 @@ que lleguen los audios de Flow. Cuando llegue un audio real, se reemplaza el
 import subprocess
 import tempfile
 import wave
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -173,6 +174,30 @@ def sfx_laugh():
     return x * ha * np.minimum(1, t / 0.08) * decay(n, 1.8) * 0.8
 
 
+def sfx_cannon():
+    # "¡POMF!": cañón de espuma (golpe grave + soplido)
+    thump = sweep(110, 40, 0.25) * decay(int(RATE * 0.25), 14)
+    air = lowpass(noise(0.35), 0.2) * decay(int(RATE * 0.35), 10) * 1.2
+    return mix((0, thump), (0, air))
+
+
+def sfx_creak():
+    # Crujido de madera: pulsos ásperos con tono que baja
+    n = int(RATE * 0.7)
+    t = np.arange(n) / RATE
+    freq = 140 - 60 * t / 0.7
+    clicks = (np.sin(2 * np.pi * np.cumsum(freq) / RATE) > 0.92).astype(float)
+    body = lowpass(clicks + noise(0.7) * 0.15, 0.3) * 4
+    return body * env(n, 0.05, 0.15)
+
+
+def sfx_pop():
+    # Burbuja que revienta: "plop" corto que sube + brillo
+    plop = sweep(500, 1500, 0.07) * decay(int(RATE * 0.07), 40)
+    sparkle = tone(2093, 0.25) * decay(int(RATE * 0.25), 14) * 0.4
+    return mix((0, plop), (0.03, sparkle))
+
+
 # --- música ----------------------------------------------------------------
 
 BPM = 150
@@ -241,6 +266,9 @@ SOUNDS = {
     "fail": sfx_fail,
     "cheer": sfx_cheer,
     "laugh": sfx_laugh,
+    "cannon": sfx_cannon,
+    "creak": sfx_creak,
+    "pop": sfx_pop,
     "music": music_loop,
 }
 
@@ -263,7 +291,10 @@ def write_mp3(name: str, samples: np.ndarray):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    global rng
     for name, make in SOUNDS.items():
+        # Semilla por sonido: agregar uno nuevo no cambia los demás.
+        rng = np.random.default_rng(zlib.crc32(name.encode()))
         write_mp3(name, make())
         print(f"{name}.mp3")
 

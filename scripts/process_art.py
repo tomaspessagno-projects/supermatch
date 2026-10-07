@@ -33,7 +33,10 @@ CHAR_SCALE = 0.23
 
 # name, box (x0, y0, x1, y1) en px de la hoja, scale, opciones.
 #   mode:  "all" (todo lo que hay en la caja), "largest" (solo la pieza más grande),
-#          "split" (cada pieza suelta es un sprite: name-0, name-1…)
+#          "split" (cada pieza suelta es un sprite: name-0, name-1…),
+#          "seed" (para piezas pegadas a otra: rellena desde lo que está por encima
+#          de seed_below sin cruzar el contorno oscuro; cut = cajas a descartar)
+#   ui:    True también la copia a public/ui/ (la usa React)
 #   tint:  separa la tela blanca; (y0, y1) limita la zona en fracción de alto.
 #   trim_x: False conserva el ancho completo (texturas que se repiten).
 CONFIG = {
@@ -101,6 +104,50 @@ CONFIG = {
         "out": UI_OUT,
         "items": [
             ("contestant", (928, 32, 1304, 568), 1.0, {}),
+        ],
+    },
+    "arbitro.jpg": {
+        "key": "green",
+        "out": GAME_OUT,
+        "items": [
+            ("ref-whistle", (30, 50, 456, 740), 0.4, {"mode": "largest", "ui": True}),
+            ("ref-card", (480, 36, 902, 740), 0.4, {"mode": "largest"}),
+            ("ref-flag", (812, 92, 1352, 740), 0.4, {"mode": "largest", "ui": True}),
+        ],
+    },
+    "presentador.jpg": {
+        "key": "green",
+        "out": UI_OUT,
+        "items": [
+            ("host", (12, 44, 440, 720), 0.6, {"mode": "largest"}),
+            ("host-34", (426, 44, 720, 724), 0.6, {"mode": "largest"}),
+            ("host-head", (740, 40, 1050, 520), 0.5, {"mode": "seed", "seed_below": 430}),
+            ("host-head-talk", (1050, 40, 1360, 520), 0.5,
+             {"mode": "seed", "seed_below": 430, "cut": [(1250, 380, 1360, 520)]}),
+        ],
+    },
+    "props-puente-v2.jpg": {
+        "key": "green",
+        "out": GAME_OUT,
+        "items": [
+            ("prop-trampoline", (40, 84, 544, 284), 0.55, {}),
+            ("prop-conveyor", (604, 100, 1068, 260), 0.55, {}),
+            ("prop-flag", (1096, 52, 1332, 344), 0.5, {}),
+            ("prop-hammer", (452, 292, 740, 724), 0.8, {}),
+            ("prop-shark", (788, 384, 1328, 716), 0.6, {}),
+            ("prop-bubble", (100, 424, 348, 672), 0.35, {}),
+        ],
+    },
+    "props-tronco.jpg": {
+        "key": "green",
+        "out": GAME_OUT,
+        "items": [
+            ("prop-log", (52, 36, 388, 364), 1.0, {"mode": "largest"}),
+            ("prop-log-stand", (456, 44, 832, 372), 0.8, {"mode": "largest"}),
+            ("prop-cannon", (900, 52, 1308, 372), 0.5, {"mode": "largest"}),
+            ("prop-foam-ball", (68, 420, 364, 712), 0.3, {"mode": "largest"}),
+            ("prop-bubble-gold", (528, 440, 776, 688), 0.35, {}),
+            ("prop-duck", (924, 404, 1288, 712), 0.5, {"mode": "largest"}),
         ],
     },
     "logo.jpg": {
@@ -171,6 +218,52 @@ def keep_only(rgba: np.ndarray, pts: np.ndarray) -> np.ndarray:
     return out
 
 
+def seed_fill(rgba: np.ndarray, box: tuple, opt: dict) -> np.ndarray:
+    """Se queda con la pieza de arriba cuando otra la toca por debajo.
+
+    Rellena desde los píxeles por encima de seed_below sin cruzar el contorno
+    oscuro, suma el contorno y tapa los huecos (ojos, boca).
+    """
+    x0, y0 = box[0], box[1]
+    h, w = rgba.shape[:2]
+    solid = rgba[..., 3] > 0.5
+    lum = rgba[..., :3] @ np.array([0.299, 0.587, 0.114])
+    dark = solid & (lum < 0.32)
+    open_ = solid & ~dark
+    for cx0, cy0, cx1, cy1 in opt.get("cut", []):
+        open_[max(cy0 - y0, 0):max(cy1 - y0, 0), max(cx0 - x0, 0):max(cx1 - x0, 0)] = False
+
+    def flood(passable: np.ndarray, starts: list) -> np.ndarray:
+        seen = np.zeros((h, w), bool)
+        q = deque()
+        for y, x in starts:
+            if passable[y, x] and not seen[y, x]:
+                seen[y, x] = True
+                q.append((y, x))
+        while q:
+            cy, cx = q.popleft()
+            for ny, nx in ((cy + 1, cx), (cy - 1, cx), (cy, cx + 1), (cy, cx - 1)):
+                if 0 <= ny < h and 0 <= nx < w and passable[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    q.append((ny, nx))
+        return seen
+
+    limit = min(h, opt["seed_below"] - y0)
+    region = flood(open_, [(y, x) for y in range(limit) for x in np.nonzero(open_[y])[0]])
+    near = region.copy()
+    for _ in range(8):
+        grown = near.copy()
+        grown[1:] |= near[:-1]; grown[:-1] |= near[1:]
+        grown[:, 1:] |= near[:, :-1]; grown[:, :-1] |= near[:, 1:]
+        near = grown
+    region |= near & dark
+    border = [(y, x) for y in range(h) for x in (0, w - 1)] + [(y, x) for x in range(w) for y in (0, h - 1)]
+    outside = flood(~region, border)
+    out = rgba.copy()
+    out[..., 3] *= ~outside
+    return out
+
+
 def trim(rgba: np.ndarray, trim_x: bool = True, pad: int = 2) -> np.ndarray:
     ys, xs = np.nonzero(rgba[..., 3] > 0.02)
     y0, y1 = max(ys.min() - pad, 0), min(ys.max() + pad + 1, rgba.shape[0])
@@ -238,6 +331,8 @@ def main() -> None:
             mode = opt.get("mode", "all")
             if mode == "all":
                 pieces = [(name, rgba)]
+            elif mode == "seed":
+                pieces = [(name, seed_fill(rgba, (x0, y0, x1, y1), opt))]
             else:
                 parts = sorted(components(rgba[..., 3] > 0.5), key=len, reverse=True)
                 parts = [p for p in parts if len(p) >= opt.get("min_area", 0)]
@@ -254,7 +349,10 @@ def main() -> None:
                     save(resize(base, scale), spec["out"], piece_name, fmt, manifest)
                     save(resize(tint, scale), spec["out"], f"{piece_name}-tint", fmt, manifest)
                 else:
-                    save(resize(piece, scale), spec["out"], piece_name, fmt, manifest)
+                    img = resize(piece, scale)
+                    save(img, spec["out"], piece_name, fmt, manifest)
+                    if opt.get("ui"):
+                        save(img, UI_OUT, piece_name, fmt, manifest)
 
     write_manifest(manifest)
 
