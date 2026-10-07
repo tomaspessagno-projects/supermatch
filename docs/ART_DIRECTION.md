@@ -151,7 +151,7 @@ articulaciones del rig (cuello, hombro, cadera) están en `src/game/engine/conte
 | Objetos (rodillo, bumper, arco, pilar, agua) | Integrado |
 | Efectos | Integrado (carteles, salpicón, polvo, estrellas, burbujas, confeti) |
 | Escudos | Integrado en la UI (selector, HUD, resultados) |
-| Fondo del estudio | Pendiente: falta `art/source/fondo-estudio.jpg` (el código ya lo usa si existe) |
-| Tramo del puente | Pendiente: falta `art/source/puente-tramo.jpg` (el código ya lo usa si existe) |
-| Logo | Pendiente: falta `art/source/logo.jpg`; mientras tanto el título usa la fuente |
+| Fondo del estudio | Integrado: parallax espejado detrás del puente |
+| Tramo del puente | Integrado: textura repetida y recortada en cada charco |
+| Logo | Integrado en la portada |
 | Fuente | Luckiest Guy (Apache 2.0) en `public/game/fonts/` y vía `next/font` |

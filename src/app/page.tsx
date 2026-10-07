@@ -6,7 +6,16 @@ export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-10">
       <div className="text-center">
-        <h1 className="text-cartoon -rotate-2 text-6xl text-sun sm:text-8xl">SUPERMATCH</h1>
+        <h1>
+          <Image
+            src="/ui/logo.png"
+            alt="Supermatch"
+            width={1005}
+            height={387}
+            priority
+            className="mx-auto h-auto w-full max-w-xl -rotate-2 drop-shadow-[0_8px_0_rgb(31_17_71/0.5)]"
+          />
+        </h1>
         <p className="mx-auto mt-4 max-w-md text-lg text-foreground/80">
           Minijuegos torpes, resbaladizos y caóticos. Elegí tu equipo: no hay vuelta atrás.
         </p>

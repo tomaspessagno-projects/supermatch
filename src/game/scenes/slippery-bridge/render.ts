@@ -21,8 +21,10 @@ const CONFETTI = Object.keys(SPRITES).filter((n) => n.startsWith("fx-confetti-")
 // Opcionales: si todavía no se generaron, se dibuja un reemplazo por código.
 const STUDIO: string = "bg-studio";
 const DECK: string = "deck-tile";
-const DECK_H = 64; // alto del tablero en px de juego
-const DECK_SURFACE = 0.26; // fracción del sprite donde está la superficie pisable
+const DECK_H = 66; // alto del tablero en px de juego (con la espuma)
+const DECK_SURFACE = 0.255; // fracción del sprite donde está el riel pisable
+const DECK_THICKNESS = 36; // del riel al borde inferior del panel
+const POOL_Y = 60; // nivel del agua de la pileta, bajo el piso
 
 /**
  * Dibuja el Puente a partir del estado de la simulación. Solo guarda estado
@@ -165,16 +167,16 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string) {
 
   function drawPool(world: World, left: number, right: number) {
     const { floorY, wallX, finishX } = world.level;
-    drawWater(left, right - left, floorY + 44);
+    drawWater(left, right - left, floorY + POOL_Y);
     // Pilares: arriba del agua enteros, abajo apenas se ven.
     for (let x = Math.ceil(left / PILLAR_EVERY) * PILLAR_EVERY; x < right; x += PILLAR_EVERY) {
       if (x < wallX || x > finishX + RUN_OFF || puddleAt(world.level, x)) continue;
-      const pos = k.vec2(x, floorY + 20);
+      const pos = k.vec2(x, floorY + DECK_THICKNESS - 4);
       k.drawSprite({ sprite: "prop-pillar", pos, anchor: "top", width: 46, height: 230, opacity: 0.3 });
       k.drawSprite({ sprite: "prop-pillar", pos, anchor: "top", width: 46, height: 230 * 0.12, quad: k.quad(0, 0, 1, 0.12) });
     }
     const bob = Math.sin(world.time * 1.6) * 3;
-    tileStrip("prop-water", left, right, floorY + 30 + bob, 30);
+    tileStrip("prop-water", left, right, floorY + POOL_Y - 14 + bob, 30);
   }
 
   function drawBridge(world: World) {
@@ -188,7 +190,7 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string) {
     let from = wallX - 40;
     for (const gap of [...puddles, { x0: finishX + RUN_OFF, x1: Infinity }]) {
       if (Number.isFinite(gap.x1)) {
-        k.drawRect({ pos: k.vec2(gap.x0, floorY), width: gap.x1 - gap.x0, height: 40, color: c.waterDeep });
+        k.drawRect({ pos: k.vec2(gap.x0, floorY), width: gap.x1 - gap.x0, height: POOL_Y, color: c.waterDeep });
       }
       drawDeck(from, gap.x0, floorY);
       from = gap.x1;
@@ -208,7 +210,7 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string) {
     }
     // Corte del tablero en el borde de cada charco.
     for (const x of [x0, x1]) {
-      k.drawRect({ pos: k.vec2(x, floorY - 2), width: 4, height: 30, anchor: "top", color: c.ink });
+      k.drawRect({ pos: k.vec2(x, floorY - 2), width: 4, height: hasSprite(DECK) ? DECK_THICKNESS : 30, anchor: "top", color: c.ink });
     }
   }
 

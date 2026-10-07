@@ -1,6 +1,7 @@
 // Generado por scripts/process_art.py. No editar a mano.
 
 export const SPRITES = {
+  "bg-studio": { file: "bg-studio.jpg", w: 1290, h: 720 },
   "char-arm": { file: "char-arm.png", w: 26, h: 80 },
   "char-arm-tint": { file: "char-arm-tint.png", w: 26, h: 80 },
   "char-head": { file: "char-head.png", w: 55, h: 59 },
@@ -9,6 +10,7 @@ export const SPRITES = {
   "char-leg": { file: "char-leg.png", w: 42, h: 78 },
   "char-torso": { file: "char-torso.png", w: 64, h: 75 },
   "char-torso-tint": { file: "char-torso-tint.png", w: 64, h: 75 },
+  "deck-tile": { file: "deck-tile.png", w: 482, h: 131 },
   "fx-bubbles": { file: "fx-bubbles.png", w: 88, h: 87 },
   "fx-burst": { file: "fx-burst.png", w: 196, h: 163 },
   "fx-confetti-0": { file: "fx-confetti-0.png", w: 24, h: 25 },
