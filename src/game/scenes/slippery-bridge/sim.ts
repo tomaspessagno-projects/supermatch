@@ -13,7 +13,7 @@ import { PLAYER_SIZE, SCORING, TUNING } from "./tuning";
  * KAPLAY. La escena solo le pasa input y dibuja el estado.
  */
 
-export type Outcome = "drowned" | "finished" | "timeout";
+export type Outcome = "finished" | "timeout";
 
 export type Player = {
   /** Centro de los pies. */
@@ -24,7 +24,7 @@ export type Player = {
   /** Aceleración horizontal aplicada en el último paso (para la inclinación). */
   ax: number;
   grounded: boolean;
-  /** Ya cayó dentro de un charco: no hay vuelta atrás. */
+  /** Ya cayó dentro de un charco: se hunde hasta el chapuzón. */
   sinking: boolean;
   /** Inclinación del torso en grados (positivo = hacia adelante). */
   lean: number;
@@ -42,6 +42,11 @@ export type World = {
   level: Level;
   time: number;
   player: Player;
+  /** Bandera donde reaparece después de caer al agua. */
+  checkpoint: number;
+  falls: number;
+  /** Segundos bajo el agua antes de reaparecer (0 = en juego). */
+  respawnIn: number;
   outcome: Outcome | null;
   endedAt: number | null;
 };
@@ -59,6 +64,8 @@ export type SimEvent =
   | { type: "wall"; impact: number }
   | { type: "bonk"; x: number; y: number }
   | { type: "splash"; x: number }
+  | { type: "checkpoint"; x: number }
+  | { type: "respawn"; x: number }
   | { type: "finish" }
   | { type: "timeout" };
 
@@ -68,24 +75,31 @@ export function createWorld(level: Level): World {
   return {
     level,
     time: 0,
+    checkpoint: level.startX,
+    falls: 0,
+    respawnIn: 0,
     outcome: null,
     endedAt: null,
-    player: {
-      x: level.startX,
-      y: level.floorY,
-      vx: 0,
-      vy: 0,
-      ax: 0,
-      grounded: true,
-      sinking: false,
-      lean: 0,
-      leanVel: 0,
-      ragdoll: false,
-      getUp: 0,
-      hitCooldown: 0,
-      jumpBuffer: 0,
-      maxX: level.startX,
-    },
+    player: standingAt(level, level.startX, level.startX),
+  };
+}
+
+function standingAt(level: Level, x: number, maxX: number): Player {
+  return {
+    x,
+    y: level.floorY,
+    vx: 0,
+    vy: 0,
+    ax: 0,
+    grounded: true,
+    sinking: false,
+    lean: 0,
+    leanVel: 0,
+    ragdoll: false,
+    getUp: 0,
+    hitCooldown: 0,
+    jumpBuffer: 0,
+    maxX,
   };
 }
 
@@ -96,6 +110,19 @@ export function step(world: World, input: SimInput, dt: number): SimEvent[] {
   const p = world.player;
 
   world.time += dt;
+
+  // Bajo el agua: el reloj sigue corriendo (esa es la penalización).
+  if (world.respawnIn > 0) {
+    world.respawnIn = Math.max(0, world.respawnIn - dt);
+    if (world.respawnIn === 0 && world.outcome === null) {
+      world.player = standingAt(level, world.checkpoint, p.maxX);
+      world.player.hitCooldown = TUNING.respawnGrace;
+      events.push({ type: "respawn", x: world.checkpoint });
+    }
+    checkEnd(world, events);
+    return events;
+  }
+
   p.getUp = Math.max(0, p.getUp - dt);
   p.hitCooldown = Math.max(0, p.hitCooldown - dt);
   p.jumpBuffer = Math.max(0, p.jumpBuffer - dt);
@@ -146,19 +173,28 @@ export function step(world: World, input: SimInput, dt: number): SimEvent[] {
   if (world.outcome === null && !p.sinking) resolveRollers(world, events);
   updateLean(p, dt);
 
-  if (!p.sinking) p.maxX = Math.max(p.maxX, p.x);
-
-  if (world.outcome === null) {
-    if (p.x >= level.finishX) {
-      end(world, "finished");
-      events.push({ type: "finish" });
-    } else if (world.time >= TUNING.timeLimit) {
-      end(world, "timeout");
-      events.push({ type: "timeout" });
+  if (!p.sinking) {
+    p.maxX = Math.max(p.maxX, p.x);
+    const next = level.checkpoints.find((x) => x > world.checkpoint);
+    if (next !== undefined && p.x >= next && world.outcome === null) {
+      world.checkpoint = next;
+      events.push({ type: "checkpoint", x: next });
     }
   }
 
+  checkEnd(world, events);
   return events;
+}
+
+function checkEnd(world: World, events: SimEvent[]) {
+  if (world.outcome !== null) return;
+  if (world.player.x >= world.level.finishX && world.respawnIn === 0) {
+    end(world, "finished");
+    events.push({ type: "finish" });
+  } else if (world.time >= TUNING.timeLimit) {
+    end(world, "timeout");
+    events.push({ type: "timeout" });
+  }
 }
 
 function resolveFloor(world: World, events: SimEvent[]) {
@@ -177,8 +213,9 @@ function resolveFloor(world: World, events: SimEvent[]) {
       p.x = clamped;
       p.vx = 0;
     }
-    if (world.outcome === null && p.y > floor + TUNING.drownDepth) {
-      end(world, "drowned");
+    if (world.outcome === null && world.respawnIn === 0 && p.y > floor + TUNING.drownDepth) {
+      world.falls++;
+      world.respawnIn = TUNING.respawnDelay;
       events.push({ type: "splash", x: p.x });
     }
     return;

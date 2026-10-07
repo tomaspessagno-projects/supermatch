@@ -5,5 +5,8 @@ export type {
   MinigameId,
   MinigameResult,
   MinigameStart,
+  RivalResult,
   RunSlot,
+  TeamInfo,
+  VirtualButton,
 } from "@/game/contract";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { wrapDegrees } from "../../engine/physics";
+import { plan as planner } from "./bot";
 import { LEVEL, type Level } from "./level";
 import {
   createWorld,
@@ -115,12 +116,34 @@ describe("Puente Resbaladizo · feel", () => {
 });
 
 describe("Puente Resbaladizo · reglas", () => {
-  it("correr sin saltar termina en el primer charco", () => {
+  it("caer al agua no termina la prueba: vuelve a la última bandera", () => {
     const world = createWorld(LEVEL);
-    runUntil(world, () => RIGHT, (w) => w.outcome !== null);
-    expect(world.outcome).toBe("drowned");
+    runUntil(world, () => RIGHT, (_, events) => events.some((e) => e.type === "splash"));
+    expect(world.outcome).toBeNull();
+    expect(world.falls).toBe(1);
     expect(world.player.x).toBeGreaterThan(LEVEL.puddles[0].x0);
     expect(world.player.x).toBeLessThan(LEVEL.puddles[0].x1);
+
+    const splashAt = world.time;
+    runUntil(world, () => RIGHT, (_, events) => events.some((e) => e.type === "respawn"));
+    expect(world.time - splashAt).toBeCloseTo(TUNING.respawnDelay, 1);
+    expect(world.player.x).toBe(LEVEL.checkpoints[0]);
+    expect(world.player.grounded).toBe(true);
+  });
+
+  it("pasar una bandera la vuelve el punto de reaparición", () => {
+    const world = createWorld({ ...LEVEL, puddles: [{ x0: 1500, x1: 1650 }], rollers: [] });
+    runUntil(world, () => RIGHT, (_, events) => events.some((e) => e.type === "splash"));
+    expect(world.checkpoint).toBe(LEVEL.checkpoints[1]);
+    runUntil(world, () => IDLE, (_, events) => events.some((e) => e.type === "respawn"));
+    expect(world.player.x).toBe(LEVEL.checkpoints[1]);
+  });
+
+  it("corriendo sin saltar se cae una y otra vez hasta que se acaba el tiempo", () => {
+    const world = createWorld(LEVEL);
+    runUntil(world, () => RIGHT, (w) => w.outcome !== null);
+    expect(world.outcome).toBe("timeout");
+    expect(world.falls).toBeGreaterThan(5);
     expect(finalScore(world)).toBeGreaterThan(0);
   });
 
@@ -142,7 +165,7 @@ describe("Puente Resbaladizo · reglas", () => {
   it.each(LEVEL.rollers.map((r) => [r.x, r] as const))(
     "rodillo en x=%i a toda velocidad: si seguís apretando te salvás, si soltás, al agua",
     (_, roller) => {
-      const outcome = (keepPushing: boolean) => {
+      const splashes = (keepPushing: boolean) => {
         // Busca un instante en que el rodillo esté abajo para forzar el choque.
         for (let t0 = 0; t0 < roller.period; t0 += 0.05) {
           const world = createWorld(LEVEL);
@@ -150,19 +173,21 @@ describe("Puente Resbaladizo · reglas", () => {
           Object.assign(world.player, { x: roller.x - 600, vx: TUNING.maxRunSpeed });
           let bonked = false;
           let frontal = false;
+          let splashed = false;
           runUntil(world, () => ({ move: !bonked || keepPushing ? 1 : 0, jumpPressed: false }), (w, events) => {
             if (!bonked && events.some((e) => e.type === "bonk")) {
               bonked = true;
               frontal = w.player.vx < 0; // si le cayó encima, lo despide hacia adelante
             }
-            return w.outcome !== null || (bonked && (!frontal || w.player.vx > 0)) || w.time > t0 + 6;
+            splashed ||= events.some((e) => e.type === "splash");
+            return splashed || (bonked && (!frontal || w.player.vx > 0)) || w.time > t0 + 6;
           });
-          if (frontal) return world.outcome;
+          if (frontal) return splashed;
         }
         throw new Error("nunca chocó");
       };
-      expect(outcome(true)).toBeNull();
-      expect(outcome(false)).toBe("drowned");
+      expect(splashes(true)).toBe(false);
+      expect(splashes(false)).toBe(true);
     },
   );
 
@@ -207,34 +232,6 @@ describe("Puente Resbaladizo · reglas", () => {
     }
   });
 });
-
-/**
- * Bot que prueba acciones en una copia del mundo y elige la primera que no
- * termina en golpe ni en charco dentro de un horizonte corto.
- */
-function planner(world: World): SimInput {
-  const p = world.player;
-  if (!p.grounded || p.ragdoll || p.getUp > 0) return RIGHT;
-
-  const jump: SimInput = { move: 1, jumpPressed: true };
-  const runningIsSafe = isSafe(world, RIGHT, 0.6);
-  if (!runningIsSafe && isSafe(world, jump, 1)) return jump;
-  if (runningIsSafe || isSafe(world, RIGHT, 0.2)) return RIGHT;
-  if (isSafe(world, IDLE, 0.6)) return IDLE;
-  return { move: -1, jumpPressed: false };
-}
-
-function isSafe(world: World, first: SimInput, horizon: number): boolean {
-  const sim: World = { ...world, player: { ...world.player } };
-  for (let t = 0; t < horizon; t += DT) {
-    const input = t < 0.1 ? first : { ...RIGHT };
-    const events = step(sim, t === 0 ? first : { ...input, jumpPressed: false }, DT);
-    if (events.some((e) => e.type === "bonk" || e.type === "splash")) return false;
-    if (sim.player.sinking) return false;
-    if (sim.outcome === "finished") return true;
-  }
-  return true;
-}
 
 function mulberry32(seed: number) {
   let a = seed;

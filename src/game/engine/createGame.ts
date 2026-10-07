@@ -5,11 +5,14 @@ import type {
   GameEvent,
   GameHandle,
   MinigameId,
+  TeamInfo,
 } from "../contract";
 import {
   registerSlipperyBridge,
   SLIPPERY_BRIDGE_SCENE,
 } from "../scenes/slippery-bridge";
+import { createAudio, loadSounds } from "./audio";
+import type { SceneContext } from "./scene";
 
 const GAME_WIDTH = 1280;
 const GAME_HEIGHT = 720;
@@ -20,14 +23,18 @@ const SCENE_BY_MINIGAME: Record<MinigameId, string> = {
 
 export type CreateGameOptions = {
   root: HTMLElement;
-  teamColor: string;
+  team: TeamInfo;
+  rivals: readonly TeamInfo[];
   emit: (event: GameEvent) => void;
+  muted: boolean;
 };
 
 export function createGame({
   root,
-  teamColor,
+  team,
+  rivals,
   emit,
+  muted,
 }: CreateGameOptions): GameHandle {
   // Canvas nuevo por instancia: quit() hace loseContext() sobre el anterior.
   const canvas = document.createElement("canvas");
@@ -43,19 +50,65 @@ export function createGame({
     background: "#1a1033",
   });
 
+  const audio = createAudio(k);
+  audio.setMuted(muted);
+
+  // Cada escena registra sus acciones; al cambiar de escena se reemplazan.
+  let goAction: (() => void) | null = null;
+  let jumpAction: (() => void) | null = null;
+  const ctx: SceneContext = {
+    team,
+    rivals,
+    emit,
+    audio,
+    onGo: (action) => {
+      goAction = action;
+    },
+    buttons: { left: false, right: false },
+    onJumpButton: (action) => {
+      jumpAction = action;
+    },
+  };
+
   loadAssets(k);
-  registerSlipperyBridge(k, { teamColor, emit });
+  loadSounds(k);
+  registerSlipperyBridge(k, ctx);
 
   return {
     send(command: GameCommand) {
       switch (command.type) {
         case "minigame:start":
+          goAction = null;
+          audio.duckMusic(true);
           k.go(SCENE_BY_MINIGAME[command.minigameId], {
             slot: command.slot,
             minigameId: command.minigameId,
           });
           break;
+        case "minigame:count":
+          audio.startMusic();
+          audio.play("count");
+          break;
+        case "minigame:go":
+          audio.play("whistle");
+          audio.duckMusic(false);
+          goAction?.();
+          break;
+        case "mute":
+          audio.setMuted(command.muted);
+          break;
+        case "input":
+          if (command.button === "jump") {
+            if (command.down) jumpAction?.();
+          } else {
+            ctx.buttons[command.button] = command.down;
+          }
+          break;
       }
+    },
+
+    focus() {
+      canvas.focus();
     },
 
     destroy() {

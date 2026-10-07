@@ -1,8 +1,9 @@
 import type { KAPLAYCtx } from "kaplay";
 import { FONT, hasSprite, SPRITES, type SpriteName } from "../../assets";
-import { createContestant, type Expression } from "../../engine/contestant";
+import { createContestant } from "../../engine/contestant";
 import { createFx } from "../../engine/fx";
-import { clamp, spring } from "../../engine/physics";
+import { clamp } from "../../engine/physics";
+import { createAnimator } from "./animator";
 import { puddleAt, rollerCenterY } from "./level";
 import type { SimEvent, World } from "./sim";
 import { TUNING } from "./tuning";
@@ -25,12 +26,14 @@ const DECK_H = 66; // alto del tablero en px de juego (con la espuma)
 const DECK_SURFACE = 0.255; // fracción del sprite donde está el riel pisable
 const DECK_THICKNESS = 36; // del riel al borde inferior del panel
 const POOL_Y = 60; // nivel del agua de la pileta, bajo el piso
+const RIVAL_OPACITY = 0.55;
+const RIVAL_Y = -10; // un poco más atrás en el puente
 
 /**
  * Dibuja el Puente a partir del estado de la simulación. Solo guarda estado
  * visual (cámara, animación, efectos); nunca modifica `world`.
  */
-export function createRenderer(k: KAPLAYCtx, teamColor: string) {
+export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: readonly string[]) {
   const c = {
     team: k.rgb(teamColor),
     ink: k.rgb("#1f1147"),
@@ -45,26 +48,26 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string) {
     danger: k.rgb("#f87171"),
   };
   const fx = createFx(k, FONT);
-  const contestant = createContestant(k, teamColor);
+  const player = { look: createContestant(k, teamColor), anim: createAnimator() };
+  const rivals = rivalColors.map((color) => ({
+    color: k.rgb(color),
+    look: createContestant(k, color),
+    anim: createAnimator(),
+  }));
 
   let camX: number | null = null;
-  let runPhase = 0;
-  let squash = 1;
-  let squashVel = 0;
-  let screamFor = 0;
   let bannerAge = 0;
 
   function react(events: readonly SimEvent[], world: World) {
     const p = world.player;
     const floor = world.level.floorY;
+    player.anim.react(events);
     for (const e of events) {
       switch (e.type) {
         case "jump":
-          squash = 1.2;
           fx.burst({ x: p.x, y: floor - 6, count: 4, speed: 140, sprites: ["fx-bubbles"], size: 20, spread: 140, gravity: -250, life: 0.7 });
           break;
         case "land":
-          squash = clamp(1 - e.impact / 2200, 0.68, 0.94);
           if (e.impact > 500) {
             fx.flash("fx-puff", p.x, floor + 4, { anchor: "bot", from: 0.15, to: 0.4, life: 0.45 });
             k.shake(2 + e.impact / 300);
@@ -77,7 +80,6 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string) {
           }
           break;
         case "bonk":
-          screamFor = 0.3;
           fx.burst({ x: (p.x + e.x) / 2, y: (p.y - 50 + e.y) / 2, count: 10, speed: 520, sprites: ["fx-star"], size: 22, spread: 360 });
           fx.popup("¡BOING!", e.x, e.y - 120, c.star, { size: 50, backdrop: "fx-burst", backdropSize: 210 });
           k.shake(14);
@@ -91,18 +93,38 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string) {
         case "finish":
           fx.burst({ x: p.x, y: p.y - 120, count: 60, speed: 650, sprites: CONFETTI, size: 18, spread: 150, life: 1.8, gravity: 500 });
           break;
+        case "checkpoint":
+          fx.burst({ x: e.x, y: floor - 90, count: 14, speed: 380, sprites: CONFETTI, size: 14, spread: 120, life: 1, gravity: 600 });
+          fx.popup("¡BANDERA!", e.x, floor - 170, c.team, { size: 36 });
+          break;
+        case "respawn":
+          fx.flash("fx-puff", e.x, floor + 4, { anchor: "bot", from: 0.2, to: 0.55, life: 0.5 });
+          break;
       }
     }
   }
 
-  function update(dt: number, world: World, move: number) {
+  /** Lo que les pasa a los rivales: animación y efectos discretos (sin sacudón ni carteles). */
+  function reactRival(i: number, events: readonly SimEvent[], world: World) {
+    rivals[i]?.anim.react(events);
+    const floor = world.level.floorY;
+    for (const e of events) {
+      if (e.type === "splash") {
+        fx.burst({ x: e.x, y: floor + 14, count: 10, speed: 520, colors: [c.water, c.white], size: 10, spread: 60, life: 0.7 });
+      } else if (e.type === "bonk") {
+        fx.burst({ x: e.x, y: e.y, count: 5, speed: 360, sprites: ["fx-star"], size: 14, spread: 360 });
+      }
+    }
+  }
+
+  function update(dt: number, world: World, rivalWorlds: readonly World[], move: number) {
     const p = world.player;
     fx.update(dt);
-
-    // Piernas: si aprieta, pedalean rápido aunque no avance (hielo).
-    runPhase += dt * (move !== 0 && p.grounded ? 14 : Math.abs(p.vx) / 40);
-    [squash, squashVel] = spring(squash, squashVel, 1, 320, 12, dt);
-    screamFor = Math.max(0, screamFor - dt);
+    player.anim.update(dt, world, move);
+    rivalWorlds.forEach((w, i) => {
+      const vx = w.player.vx;
+      rivals[i]?.anim.update(dt, w, Math.abs(vx) > 40 ? Math.sign(vx) : 0);
+    });
 
     const minCam = world.level.wallX - 60 + HALF_VIEW;
     const target = clamp(p.x + LOOK_AHEAD, minCam, world.level.finishX + RUN_OFF - HALF_VIEW);
@@ -113,19 +135,47 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string) {
     bannerAge = world.outcome ? bannerAge + dt : 0;
   }
 
-  function draw(world: World) {
+  function draw(world: World, rivalWorlds: readonly World[]) {
     const center = camX ?? VIEW_W / 2;
     const left = center - HALF_VIEW - 150;
     const right = center + HALF_VIEW + 150;
     drawStudio(center);
     drawPool(world, left, right);
     drawBridge(world);
+    drawFlags(world);
+    drawRivals(rivalWorlds, left, right);
     drawShadow(world);
-    drawPlayer(world);
+    if (world.respawnIn === 0) player.look.draw(player.anim.pose(world));
     drawPuddleWater(world);
     drawRollers(world, left, right);
     fx.draw();
-    drawOverlay(world);
+    drawOverlay(world, rivalWorlds);
+  }
+
+  function drawRivals(rivalWorlds: readonly World[], left: number, right: number) {
+    rivalWorlds.forEach((w, i) => {
+      const rival = rivals[i];
+      const p = w.player;
+      if (!rival || w.respawnIn > 0 || p.x < left || p.x > right) return;
+      rival.look.draw(rival.anim.pose(w, RIVAL_Y, RIVAL_OPACITY));
+      // Marcador del equipo sobre la cabeza.
+      k.drawCircle({ pos: k.vec2(p.x, p.y + RIVAL_Y - 132), radius: 7, color: rival.color, outline: { width: 3, color: c.ink }, opacity: 0.9 });
+    });
+  }
+
+  function drawFlags(world: World) {
+    const { floorY, checkpoints } = world.level;
+    for (const x of checkpoints.slice(1)) {
+      const reached = world.checkpoint >= x;
+      k.drawLine({ p1: k.vec2(x, floorY + 2), p2: k.vec2(x, floorY - 110), width: 5, color: c.ink });
+      const top = floorY - 108;
+      const wave = Math.sin(world.time * 6 + x) * 4;
+      k.drawPolygon({
+        pts: [k.vec2(x + 2, top), k.vec2(x + 54, top + 14 + wave), k.vec2(x + 2, top + 30)],
+        color: reached ? c.team : c.white,
+        outline: { width: 3, color: c.ink },
+      });
+    }
   }
 
   /** Repite un sprite en horizontal, alineado al mundo y espejado cada vez para que no se note la unión. */
@@ -249,49 +299,7 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string) {
     }
   }
 
-  function drawPlayer(world: World) {
-    const p = world.player;
-    const t = world.time;
-    const lying = p.getUp > 0;
-    const tumbling = p.ragdoll && !p.grounded;
-    const airborne = !p.grounded && !p.ragdoll;
-
-    let legs: [number, number];
-    let arms: [number, number];
-    if (tumbling) {
-      legs = [Math.sin(t * 18) * 45, -Math.sin(t * 18 + 1) * 45];
-      arms = [Math.sin(t * 20) * 130, Math.cos(t * 17) * 130];
-    } else if (lying) {
-      legs = [15 + Math.sin(t * 22) * 15, -10 + Math.cos(t * 22) * 15];
-      arms = [160, -160];
-    } else if (airborne || p.sinking) {
-      legs = [-25 + Math.sin(t * 16) * 10, 35 + Math.sin(t * 15) * 10];
-      arms = [-150 + Math.sin(t * 16) * 30, 150 + Math.sin(t * 14) * 30];
-    } else {
-      const swing = Math.sin(runPhase) * 38;
-      legs = [-swing, swing];
-      arms = [swing * 1.1, -swing * 1.1];
-    }
-
-    let expression: Expression = "normal";
-    if (p.ragdoll || lying) expression = "dizzy";
-    else if (p.sinking || screamFor > 0 || (airborne && p.vy > 250)) expression = "scream";
-
-    contestant.draw({
-      x: p.x,
-      y: p.y,
-      lean: p.lean,
-      squash,
-      legs,
-      arms,
-      headTilt: clamp(-p.leanVel * 0.03, -20, 20),
-      expression,
-      dizzy: p.ragdoll || lying,
-      time: t,
-    });
-  }
-
-  function drawOverlay(world: World) {
+  function drawOverlay(world: World, rivalWorlds: readonly World[]) {
     const { startX, finishX, puddles, rollers } = world.level;
     const track = { x: 440, y: 30, w: 400 };
     const toTrack = (x: number) => track.x + clamp((x - startX) / (finishX - startX), 0, 1) * track.w;
@@ -304,32 +312,24 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string) {
       k.drawSprite({ sprite: "prop-roller", pos: k.vec2(toTrack(r.x), track.y), anchor: "center", width: 13, fixed: true });
     }
     k.drawSprite({ sprite: "prop-arch", pos: k.vec2(track.x + track.w, track.y + 7), anchor: "bot", width: 26, fixed: true });
+    rivalWorlds.forEach((w, i) => {
+      const rival = rivals[i];
+      if (!rival) return;
+      k.drawCircle({ pos: k.vec2(toTrack(w.player.maxX), track.y), radius: 7, color: rival.color, outline: { width: 2, color: c.ink }, fixed: true });
+    });
     k.drawCircle({ pos: k.vec2(toTrack(world.player.x), track.y), radius: 13, color: c.team, outline: { width: 3, color: c.ink }, fixed: true });
     k.drawSprite({ sprite: "char-head", pos: k.vec2(toTrack(world.player.x), track.y), anchor: "center", width: 22, fixed: true });
 
     const timeLeft = Math.max(0, TUNING.timeLimit - world.time);
     k.drawText({ text: String(Math.ceil(timeLeft)), pos: k.vec2(VIEW_W / 2, 72), size: 34, font: FONT, anchor: "center", color: timeLeft < 10 ? c.danger : c.white, fixed: true });
 
-    if (world.time < 4) {
-      k.drawText({
-        text: "A/D o FLECHAS: patinar  ·  ESPACIO: saltar",
-        pos: k.vec2(VIEW_W / 2, VIEW_H - 40),
-        size: 26,
-        font: FONT,
-        anchor: "center",
-        color: c.white,
-        opacity: Math.min(1, 4 - world.time),
-        fixed: true,
-      });
-    }
-
     if (world.outcome) {
-      const text = { drowned: "¡AL AGUA!", finished: "¡LLEGASTE!", timeout: "¡TIEMPO!" }[world.outcome];
-      const color = { drowned: c.water, finished: c.star, timeout: c.white }[world.outcome];
+      const text = { finished: "¡LLEGASTE!", timeout: "¡TIEMPO!" }[world.outcome];
+      const color = { finished: c.star, timeout: c.white }[world.outcome];
       const scale = 1 + 0.35 * Math.max(0, 1 - bannerAge * 4);
       k.drawText({ text, pos: k.vec2(VIEW_W / 2, 280), size: 96, font: FONT, anchor: "center", scale, color, fixed: true, angle: -4 });
     }
   }
 
-  return { react, update, draw };
+  return { react, reactRival, update, draw };
 }

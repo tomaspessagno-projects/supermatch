@@ -10,6 +10,8 @@ export function Hud() {
   const banked = useSession((s) =>
     s.results.reduce((total, r) => total + r.score, 0),
   );
+  const muted = useSession((s) => s.muted);
+  const toggleMuted = useSession((s) => s.toggleMuted);
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-3 sm:p-4">
@@ -26,6 +28,19 @@ export function Hud() {
         <span data-testid="hud-score" className="text-cartoon text-2xl text-white tabular-nums sm:text-4xl">
           {banked + liveScore}
         </span>
+        {/* Por encima de los carteles del episodio: se puede silenciar en cualquier momento. */}
+        <button
+          type="button"
+          onClick={toggleMuted}
+          // Sin robarle el foco al juego: si no, la barra espaciadora lo vuelve a tocar.
+          onMouseDown={(e) => e.preventDefault()}
+          aria-label={muted ? "Activar sonido" : "Silenciar"}
+          aria-pressed={muted}
+          data-testid="mute"
+          className="pointer-events-auto relative z-20 ml-1 grid size-9 place-items-center rounded-full border-4 border-ink bg-white/20 text-lg backdrop-blur-sm sm:size-11"
+        >
+          {muted ? "🔇" : "🔊"}
+        </button>
       </div>
     </div>
   );

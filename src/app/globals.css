@@ -17,6 +17,20 @@
   --font-display: var(--font-luckiest);
   --animate-wobble: wobble 2.6s ease-in-out infinite;
 
+  @keyframes pop {
+    0% {
+      scale: 0.3;
+      opacity: 0;
+    }
+    40% {
+      scale: 1.25;
+      opacity: 1;
+    }
+    100% {
+      scale: 1;
+    }
+  }
+
   @keyframes wobble {
     0%,
     100% {

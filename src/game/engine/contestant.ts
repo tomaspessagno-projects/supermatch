@@ -48,6 +48,8 @@ export type ContestantPose = {
   /** Estrellitas girando sobre la cabeza. */
   dizzy: boolean;
   time: number;
+  /** Los rivales se dibujan semitransparentes. */
+  opacity?: number;
 };
 
 const anchorOf = (k: KAPLAYCtx, [fx, fy]: readonly [number, number]) =>
@@ -67,6 +69,7 @@ export function createContestant(k: KAPLAYCtx, teamColor: string) {
   const back = k.rgb(170, 165, 200);
   const white = k.rgb(255, 255, 255);
 
+  let opacity = 1;
   const part = (sprite: string, pos: { x: number; y: number }, joint: readonly [number, number], angle: number, color = white) =>
     k.drawSprite({
       sprite,
@@ -75,6 +78,7 @@ export function createContestant(k: KAPLAYCtx, teamColor: string) {
       angle,
       scale: SPRITE_RES,
       color,
+      opacity,
     });
 
   function arm(angle: number, behind: boolean) {
@@ -89,6 +93,7 @@ export function createContestant(k: KAPLAYCtx, teamColor: string) {
   }
 
   function draw(pose: ContestantPose) {
+    opacity = pose.opacity ?? 1;
     const rad = (pose.lean * Math.PI) / 180;
     // Tirado en el piso, la cadera baja hasta casi tocar el suelo.
     const hipY = -Math.max(8, HIP_HEIGHT * Math.abs(Math.cos(rad)));
@@ -121,6 +126,7 @@ export function createContestant(k: KAPLAYCtx, teamColor: string) {
           anchor: "center",
           width: 11,
           angle: pose.time * 200,
+          opacity,
         });
       }
     }

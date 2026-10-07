@@ -41,6 +41,8 @@ export const TUNING = {
   // Charcos
   fallCommitDepth: 10, // px bajo el piso: desde acá ya no hay salvación
   drownDepth: 140, // px bajo el piso: splash
+  respawnDelay: 1.5, // s bajo el agua antes de volver a la última bandera
+  respawnGrace: 0.5, // s sin que los rodillos lo golpeen al reaparecer
 
   // Partida
   timeLimit: 45, // s

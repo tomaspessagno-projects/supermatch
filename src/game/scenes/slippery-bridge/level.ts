@@ -21,6 +21,8 @@ export type Level = {
   finishX: number;
   puddles: readonly Puddle[];
   rollers: readonly Roller[];
+  /** Banderas de reaparición, de menor a mayor. La primera es la largada. */
+  checkpoints: readonly number[];
 };
 
 // Layout fijo: en un leaderboard asíncrono todos tienen que jugar el mismo puente.
@@ -43,6 +45,8 @@ export const LEVEL: Level = {
     { x: 3950, radius: 50, clearance: 4, bob: 120, period: 2.4, phase: 0 },
     { x: 6050, radius: 54, clearance: 4, bob: 125, period: 2, phase: 0.5 },
   ],
+  // Siempre en piso firme, después de un desafío y antes del siguiente.
+  checkpoints: [140, 1200, 2950, 5050],
 };
 
 /** Altura del centro del rodillo en el instante `time`. */

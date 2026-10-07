@@ -3,6 +3,7 @@ import type {
   MinigameId,
   MinigameResult,
   MinigameStart,
+  RivalResult,
   RunSlot,
 } from "@/bridge/events";
 import * as api from "@/lib/supabase/api";
@@ -32,6 +33,9 @@ export type Submission =
   | { status: "offline" }
   | { status: "error"; message: string };
 
+/** Momento del episodio que muestra la UI encima del juego. */
+export type EpisodePhase = "intro" | "countdown" | "playing" | "between";
+
 type SessionState = {
   team: TeamId | null;
   nickname: string | null;
@@ -41,18 +45,37 @@ type SessionState = {
   results: MinigameResult[];
   /** Puntaje en vivo del minijuego en curso, para el HUD. */
   liveScore: number;
+  phase: EpisodePhase;
+  /** Puntos de los rivales (bots) en este episodio, por equipo y prueba. */
+  rivalScores: Record<string, number[]>;
   /** Id del run abierto en el servidor; null si no se pudo abrir. */
   run: Promise<string | null> | null;
   submission: Submission;
+  /** Sonido apagado (se recuerda en este navegador). */
+  muted: boolean;
 
   loadProfile: () => Promise<void>;
   chooseTeam: (team: TeamId) => Promise<void>;
   startRun: () => void;
+  startCountdown: () => void;
+  go: () => void;
   setLiveScore: (score: number) => void;
-  recordResult: (result: MinigameResult) => void;
+  recordResult: (result: MinigameResult, rivals: readonly RivalResult[]) => void;
+  continueEpisode: () => void;
   submitRun: () => Promise<void>;
   retrySubmit: () => Promise<void>;
+  toggleMuted: () => void;
 };
+
+const MUTED_KEY = "supermatch:muted";
+
+function readMuted() {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(MUTED_KEY) === "1";
+  } catch {
+    return false; // modo privado o almacenamiento bloqueado
+  }
+}
 
 const messageOf = (error: unknown) =>
   (error as { message?: string } | null)?.message ?? String(error);
@@ -64,8 +87,11 @@ export const useSession = create<SessionState>()((set, get) => ({
   profileStatus: "unknown",
   results: [],
   liveScore: 0,
+  phase: "intro",
+  rivalScores: {},
   run: null,
   submission: { status: "idle" },
+  muted: readMuted(),
 
   async loadProfile() {
     if (get().profileStatus !== "unknown") return;
@@ -93,13 +119,22 @@ export const useSession = create<SessionState>()((set, get) => ({
   startRun() {
     // Se abre en paralelo a la carga del juego; el envío lo espera.
     const run = get().online ? api.startRun().catch(() => null) : Promise.resolve(null);
-    set({ results: [], liveScore: 0, run, submission: { status: "idle" } });
+    set({ results: [], liveScore: 0, phase: "intro", rivalScores: {}, run, submission: { status: "idle" } });
   },
+
+  startCountdown: () => set((s) => (s.phase === "intro" ? { phase: "countdown" } : s)),
+  go: () => set((s) => (s.phase === "countdown" ? { phase: "playing" } : s)),
 
   setLiveScore: (liveScore) => set({ liveScore }),
 
-  recordResult: (result) =>
-    set((s) => ({ results: [...s.results, result], liveScore: 0 })),
+  recordResult: (result, rivals) =>
+    set((s) => {
+      const rivalScores = { ...s.rivalScores };
+      for (const r of rivals) rivalScores[r.teamId] = [...(rivalScores[r.teamId] ?? []), r.score];
+      return { results: [...s.results, result], liveScore: 0, rivalScores, phase: "between" };
+    }),
+
+  continueEpisode: () => set((s) => (s.phase === "between" ? { phase: "intro" } : s)),
 
   async submitRun() {
     const { submission, run, results } = get();
@@ -124,4 +159,25 @@ export const useSession = create<SessionState>()((set, get) => ({
     set({ submission: { status: "idle" } });
     await get().submitRun();
   },
+
+  toggleMuted() {
+    const muted = !get().muted;
+    set({ muted });
+    try {
+      window.localStorage.setItem(MUTED_KEY, muted ? "1" : "0");
+    } catch {
+      // sin almacenamiento: vale solo para esta visita
+    }
+  },
 }));
+
+/** Puntos del episodio por equipo (tu equipo con tus resultados, los demás con los bots). */
+export function episodeTotals(
+  team: string,
+  results: readonly MinigameResult[],
+  rivalScores: Record<string, number[]>,
+): Record<string, number> {
+  const totals: Record<string, number> = { [team]: results.reduce((sum, r) => sum + r.score, 0) };
+  for (const [id, scores] of Object.entries(rivalScores)) totals[id] = scores.reduce((a, b) => a + b, 0);
+  return totals;
+}
