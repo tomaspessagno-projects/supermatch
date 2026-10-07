@@ -1,10 +1,12 @@
-import type { GameEvent, TeamInfo } from "../contract";
+import type { GameEvent, NetLink, RivalSpec, TeamInfo } from "../contract";
 import type { Audio } from "./audio";
 
 /** Lo que cada escena de minijuego recibe de createGame. */
 export type SceneContext = {
   team: TeamInfo;
-  rivals: readonly TeamInfo[];
+  rivals: readonly RivalSpec[];
+  /** Solo en salas online: teclas propias hacia la red y las de los demás. */
+  net?: NetLink;
   emit: (event: GameEvent) => void;
   audio: Audio;
   /** La escena registra qué hacer cuando suena el silbato de largada. */

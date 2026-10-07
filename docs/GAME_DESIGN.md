@@ -295,3 +295,35 @@ Diagnóstico después de la Fase 1, el Tronco y el Puente v2:
 4. **Medallas y récords** (bronce, plata, oro por prueba) y episodio del día. M.
 5. **Clips del concursante** (correr, patinar, golpe, festejo) en lugar del títere. L.
 
+
+## 13. Modos de juego
+
+Después de elegir equipo, la portada ofrece tres formas de jugar el mismo episodio
+de 3 pruebas, y una meta compartida:
+
+| Modo | Qué es | Para quién |
+|---|---|---|
+| **Jugar solo** | Vos contra 3 bots (uno de cada otro color, con niveles mezclados en cada prueba) | Para jugar ya, sin esperar a nadie |
+| **Carrera online** | En vivo contra hasta 3 personas al azar; si faltan, completan bots | La emoción de ganarle a alguien real |
+| **Con amigos** | Sala con código o link; el anfitrión arranca y puede pedir revancha | Juntadas, grupos de WhatsApp |
+| **Misión del equipo** | Meta del día para todos los de un color (10.000 puntos). Cada partida suma, en cualquier modo | Colaborar con desconocidos de tu facción |
+
+**Decisiones de diseño**
+
+- Online se ven todos en la misma pista (semitransparentes, con su apodo arriba) y
+  los avisos nombran a las personas: "¡TE PASÓ PATO RESBALOSO!".
+- No hay botón "¡A JUGAR!": la sala marca la hora y todos largan juntos. La tabla
+  entre pruebas espera a que lleguen todos ("jugando…").
+- Tu puntaje suma a tu equipo igual que solo: no hay que elegir entre jugar con
+  amigos o ayudar a tu color.
+- Dos personas del mismo color pueden competir entre sí; los bots siempre toman
+  colores libres.
+
+**Lo que sigue (online)**
+
+1. **Pruebas cooperativas en sala**: la red ya sirve para que varios controlen
+   cosas en la misma pista (por ejemplo, *El Colchón*: dos sostienen una lona y
+   tienen que atajar a los que caen; o *Baldes al Tanque* por parejas, uno carga
+   y otro estabiliza).
+2. Reacciones rápidas en la tabla (😂 👏 💦) para hablar sin chat.
+3. Revancha automática: si todos vuelven a la sala, arranca sola.

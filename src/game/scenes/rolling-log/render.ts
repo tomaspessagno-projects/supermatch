@@ -37,7 +37,7 @@ type CannonKey = `${-1 | 1}:${"low" | "high"}`;
 export function createRenderer(
   k: KAPLAYCtx,
   teamColor: string,
-  rivalTeams: readonly { color: string; name: string }[],
+  rivalTeams: readonly { color: string; name: string; tag?: string }[],
 ) {
   const c = {
     team: k.rgb(teamColor),
@@ -56,8 +56,9 @@ export function createRenderer(
   const show = createShow(k, [teamColor, ...rivalTeams.map((r) => r.color)]);
   const ranking = createRankTracker(rivalTeams.map((r) => r.name.toUpperCase()));
   const player = { look: createContestant(k, teamColor), anim: createAnimator() };
-  const rivals = rivalTeams.map(({ color }, i) => ({
+  const rivals = rivalTeams.map(({ color, tag }, i) => ({
     color: k.rgb(color),
+    tag,
     look: createContestant(k, color),
     anim: createAnimator(),
     spot: RIVAL_SPOTS[i % RIVAL_SPOTS.length],
@@ -358,6 +359,11 @@ export function createRenderer(
     // Equipo y vidas sobre el tronquito.
     const top = cy - (radius + 120) * spot.scale;
     k.drawCircle({ pos: k.vec2(spot.x, top), radius: 8, color: rival.color, outline: { width: 3, color: c.ink } });
+    if (rival.tag) {
+      // El apodo de la persona, arriba de las vidas.
+      k.drawText({ text: rival.tag, pos: k.vec2(spot.x + 2, top - 38), size: 18, font: FONT, anchor: "center", color: c.ink });
+      k.drawText({ text: rival.tag, pos: k.vec2(spot.x, top - 40), size: 18, font: FONT, anchor: "center", color: c.white });
+    }
     for (let life = 0; life < TUNING.lives; life++) {
       k.drawCircle({
         pos: k.vec2(spot.x - 14 + life * 14, top - 18),

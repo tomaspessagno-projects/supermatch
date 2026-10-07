@@ -31,7 +31,10 @@ supermatch/
 ├── src/
 │   ├── app/                          # Rutas (App Router). Solo UI.
 │   │   ├── layout.tsx
-│   │   ├── page.tsx                  # Landing + selector de facción
+│   │   ├── page.tsx                  # Landing: facción, modo de juego y Misión del equipo
+│   │   ├── online/
+│   │   │   ├── page.tsx
+│   │   │   └── OnlineLobby.tsx       # Buscar rivales, crear sala, entrar con código
 │   │   ├── play/
 │   │   │   ├── page.tsx
 │   │   │   └── PlayScreen.tsx        # GameHost + HUD + carteles del episodio + botones táctiles
@@ -49,6 +52,8 @@ supermatch/
 │   │   │   ├── EpisodeOverlay.tsx    # Presentación, 3-2-1, "¡YA!", tabla entre pruebas
 │   │   │   ├── Host.tsx              # El presentador: cabeza que habla + globo
 │   │   │   └── TeamRow.tsx           # Fila de tabla de equipos (episodio y resultados)
+│   │   ├── home/PlayMenu.tsx         # Elegir equipo y después: solo, carrera online o con amigos
+│   │   ├── mission/MissionBoard.tsx  # Los 4 tanques de la misión del día, en vivo
 │   │   └── TeamPicker.tsx            # Tarjetas con escudo por equipo
 │   │
 │   ├── game/                         # Mundo KAPLAY. TS puro.
@@ -65,6 +70,7 @@ supermatch/
 │   │   │   ├── show.ts               # Luces, hinchada, "EN VIVO", puesto y adelantamientos
 │   │   │   ├── timefx.ts             # Congelado de impacto y cámara lenta
 │   │   │   ├── random.ts             # Aleatorio con semilla (bots)
+│   │   │   ├── rivals.ts             # Los 3 rivales de cualquier prueba: bots o remotos
 │   │   │   ├── physics.ts            # Helpers puros: approach, spring, colisiones
 │   │   │   ├── contestant.ts         # Rig del concursante (títere de cartón)
 │   │   │   └── fx.ts                 # Partículas, carteles y destellos
@@ -85,15 +91,21 @@ supermatch/
 │   │   ├── input.ts                  # Juego activo: botones táctiles y pips de la cuenta
 │   │   └── events.ts                 # Re-exporta los tipos del contrato para la UI
 │   │
-│   ├── store/session.ts              # Zustand: facción, fase del episodio, resultados, rivales, silencio
+│   ├── store/session.ts              # Zustand: facción, modo, participantes, fase, puntajes, silencio
+│   ├── online/                       # Carreras en vivo (no sabe de KAPLAY: usa el contrato)
+│   │   ├── channel.ts                # Canal de sala: presencia + mensajes (Supabase o entre pestañas)
+│   │   ├── protocol.ts               # Mensajes, tiempos, anfitrión, emparejamiento, participantes
+│   │   ├── inputs.ts                 # Teclas por tick comprimidas ("4*40,5")
+│   │   └── room.ts                   # Store de la sala + el episodio en vivo + NetLink para el juego
 │   └── lib/
 │       ├── teams.ts                  # Facciones (espejo de public.teams)
 │       ├── minigames.ts              # Nombre, regla y controles de cada prueba
 │       ├── host.ts                   # Lo que dice el presentador
+│       ├── participants.ts           # Los 4 del episodio y la tabla
 │       ├── nicknames.ts              # Apodo al azar ("Pato Resbaloso")
 │       └── supabase/
 │           ├── client.ts             # Cliente del navegador (URL + publishable key)
-│           └── api.ts                # loadProfile, joinTeam, startRun, finishRun, ranking
+│           └── api.ts                # loadProfile, joinTeam, startRun, finishRun, ranking, misiones
 │
 ├── art/source/                       # Hojas originales generadas (fuente de verdad del arte)
 ├── art/source/audio/                 # Audios de Flow (se procesan a public/game/sfx/)
@@ -120,6 +132,8 @@ Las fuerza ESLint (`no-restricted-imports` en `eslint.config.mjs`):
 1. Landing: si el navegador ya tiene sesión, se carga el perfil (equipo bloqueado y
    apodo). Si no, al elegir facción se crea una sesión anónima y el perfil
    (`players`) con un apodo al azar. La base no deja cambiar el equipo después.
+   Con el equipo elegido aparecen los modos: solo (sigue acá) u online (ver
+   "Carreras online").
 2. `GameHost` importa el motor, resetea el run en el store y manda
    `minigame:start { slot: 1 }`: la escena se carga quieta, con los rivales en la
    largada. En paralelo, el store llama a `start_run()` (el servidor fija la hora
@@ -131,7 +145,7 @@ Las fuerza ESLint (`no-restricted-imports` en `eslint.config.mjs`):
      simular. El juego emite `minigame:score` (HUD en vivo, como mucho 10 por
      segundo) y al terminar, después de `endDelay`, `minigame:finished { result,
      rivals }`;
-   - `between`: tabla de equipos con tus puntos y los de los bots. Sigue sola a
+   - `between`: tabla con tus puntos y los de los otros tres. Sigue sola a
      los 7 s (o con el botón) a la `intro` de la prueba siguiente, que `GameHost`
      carga con `minigame:start`. En la tercera dice "TABLA FINAL" y lleva a `/results`.
 4. Los rivales son bots de los otros 3 equipos que corren la misma simulación en la
@@ -143,6 +157,80 @@ Las fuerza ESLint (`no-restricted-imports` en `eslint.config.mjs`):
 
 **Sin conexión:** si Supabase no responde, se juega igual. El run no suma y la
 pantalla de resultados lo avisa.
+
+Cada run terminado también suma a la **Misión del equipo** del día
+(`team_missions`, día de Argentina): `finish_run` hace el upsert en la misma
+transacción y la portada, `/leaderboard` y `/results` la escuchan por Realtime.
+
+## Carreras online
+
+Tres modos, elegidos en la portada después del equipo:
+
+| Modo | Rivales | Ruta |
+|---|---|---|
+| Solo | 3 bots, uno de cada otro color | `/play` |
+| Carrera online | Hasta 3 personas al azar; los huecos, bots | `/online?modo=rapida` |
+| Con amigos | Sala con código de 5 letras / link | `/online` y `/online?sala=CÓDIGO` |
+
+**Cómo funciona (input streaming determinista).** Las simulaciones son puras y
+de paso fijo, así que no hace falta mandar posiciones: cada compu manda sus
+**teclas por tick** y las demás re-simulan a esa persona igual que en su compu.
+
+1. **Sala** = un canal de Supabase Realtime (`sm:room:CÓDIGO`) con *Presence*
+   (quién está) y *Broadcast* (mensajes). El **anfitrión** es el que está hace
+   más tiempo; si se va, toma la posta el siguiente.
+2. **Emparejamiento**: todos los que buscan entran a `sm:matchmaking`. El que más
+   espera arma la sala: con 4 enseguida, con 2 o 3 a los 10 s. A los 15 s solo
+   se ofrece jugar contra la compu.
+3. **`start`** (anfitrión): semilla del episodio, los jugadores y la largada de la
+   prueba 1 (en 8 s). Todos arman los mismos 4 participantes
+   (`buildParticipants`): las personas y bots de los colores libres.
+4. Cada prueba arranca a la **hora que marca el anfitrión** (`go`, 9,5 s después
+   de que llegaron todos los resultados, o a los 60 s como máximo). La cuenta
+   regresiva está atada a esa hora: si una compu se atrasó, saltea lo que pasó.
+5. **Durante la prueba**: cada compu junta sus teclas y las manda cada 250 ms
+   (`in`, comprimidas: medio segundo con una flecha son 4 caracteres). A los
+   remotos se los ve con **0,6 s de atraso** (`REMOTE_DELAY_TICKS`), así llegan
+   fluidos.
+6. **Bots**: salen de la semilla de cada prueba, así que son iguales en todas
+   las compus. Su puntaje final depende de cuándo terminaste vos, por eso vale
+   el del **árbitro** (el primero de la lista), que lo manda con su resultado.
+7. **`res`**: cada uno manda su puntaje real; las tablas muestran "jugando…"
+   hasta que llega. El que se va queda con 0 y "SE FUE".
+
+El juego no sabe de la red: recibe un `NetLink` (`sendInput`, `remoteInput`,
+`remoteTicks`) y `RivalSpec[]` con `control: "bot" | "remote"`. `engine/rivals.ts`
+corre los bots a la par del jugador y avanza los remotos hasta donde llegaron
+sus teclas.
+
+**Puntaje y ranking**: lo tuyo se valida y suma igual que solo (`finish_run`).
+Las salas no escriben nada en la base.
+
+**Canales públicos**: las salas usan canales públicos de Realtime (alcanza con la
+publishable key). Necesitan que en Supabase → Realtime → Settings siga activado
+*Allow public access* (viene así). Si se apaga, las salas fallan con "No se pudo
+conectar a la sala". Alguien con la key podría entrar a una sala adivinando el
+código (32⁵ ≈ 33 millones) y molestar en esa carrera, pero no tocar el ranking:
+cada puntaje se valida en `finish_run` con la sesión de su dueño. Si hace falta
+cerrarlo: canales privados + políticas RLS en `realtime.messages`.
+
+**Probar sin servidor**: `?red=local` usa `BroadcastChannel` entre pestañas del
+mismo navegador (se recuerda en la pestaña). Ej.: abrir `/online?red=local`,
+crear sala y en otra pestaña `/online?red=local&sala=CÓDIGO`.
+
+**Cupos del plan gratis de Supabase Realtime** (todo el proyecto): 200
+conexiones a la vez, **100 mensajes por segundo** (enviados + recibidos), 2
+millones por mes, 20 mensajes de presencia por segundo. Una sala de 4 personas
+usa ~64 mensajes por segundo durante una prueba (4 × 4 paquetes, cada uno lo
+reciben 3); una de 2 personas, ~16. O sea: **una o dos salas llenas a la vez**.
+Para más: plan Pro (500/s), bajar a 2 paquetes por segundo subiendo el atraso a
+~0,9 s, o cambiar el transporte (`channel.ts`) por WebRTC o un servidor propio
+(Cloudflare Durable Objects) sin tocar el resto.
+
+**Limitaciones conocidas**: la simulación usa `Math.sin`/`cos`, que pueden diferir
+en el último decimal entre navegadores distintos; en una carrera larga un remoto
+podría verse un poco distinto de lo que hizo. No importa para el puntaje, que
+llega aparte. Una pestaña en segundo plano no juega (el navegador la frena).
 
 ## Infraestructura
 

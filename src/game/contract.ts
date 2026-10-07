@@ -13,9 +13,11 @@ export type RunSlot = 1 | 2 | 3;
 export type MinigameStart = {
   slot: RunSlot;
   minigameId: MinigameId;
+  /** Semilla de los bots: en una sala online es la misma para todos. */
+  seed: number;
 };
 
-export type MinigameResult = MinigameStart & {
+export type MinigameResult = Pick<MinigameStart, "slot" | "minigameId"> & {
   score: number;
   durationMs: number;
 };
@@ -23,8 +25,35 @@ export type MinigameResult = MinigameStart & {
 /** Un equipo en cancha: id (de public.teams), color de camiseta y nombre corto ("Azul"). */
 export type TeamInfo = { id: string; color: string; name: string };
 
-/** Puntaje de un rival manejado por la computadora (cosmético, no se envía). */
-export type RivalResult = { teamId: string; score: number };
+/** Teclas de un tick: igual para todas las pruebas. */
+export type PlayerInput = { move: number; jumpPressed: boolean };
+
+/**
+ * Un rival en la prueba: un bot (lo maneja la computadora, igual en todas las
+ * compus de la sala) o un jugador remoto (se re-simula con sus teclas).
+ */
+export type RivalSpec = {
+  id: string;
+  team: TeamInfo;
+  /** Para los avisos: el apodo si es una persona, el color si es un bot. */
+  name: string;
+  control: "bot" | "remote";
+};
+
+/** Puntaje de un rival al terminar la prueba (para los bots, cosmético). */
+export type RivalResult = { id: string; score: number };
+
+/**
+ * Lo que el juego necesita de la red en una sala online. El juego no sabe de
+ * Supabase: le pasa sus teclas tick a tick y pide las de los demás.
+ */
+export type NetLink = {
+  sendInput: (slot: RunSlot, tick: number, input: PlayerInput) => void;
+  /** Teclas de un jugador remoto en un tick, si ya llegaron. */
+  remoteInput: (id: string, slot: RunSlot, tick: number) => PlayerInput | undefined;
+  /** Cuántos ticks de ese jugador llegaron. */
+  remoteTicks: (id: string, slot: RunSlot) => number;
+};
 
 export type VirtualButton = "left" | "right" | "jump";
 

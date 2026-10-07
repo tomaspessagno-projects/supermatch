@@ -153,6 +153,38 @@ export type Database = {
           },
         ]
       }
+      team_missions: {
+        Row: {
+          completed_at: string | null
+          day: string
+          progress: number
+          target: number
+          team_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          day: string
+          progress?: number
+          target: number
+          team_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          day?: string
+          progress?: number
+          target?: number
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_missions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_totals: {
         Row: {
           runs_count: number
@@ -209,7 +241,18 @@ export type Database = {
         Args: { p_results: Json; p_run_id: string }
         Returns: number
       }
+      mission_day: { Args: never; Returns: string }
+      mission_target: { Args: never; Returns: number }
       start_run: { Args: never; Returns: string }
+      today_missions: {
+        Args: never
+        Returns: {
+          completed_at: string
+          progress: number
+          target: number
+          team_id: string
+        }[]
+      }
     }
     Enums: {
       run_status: "in_progress" | "finished" | "abandoned"

@@ -70,7 +70,7 @@ type Streak = { x: number; y: number; len: number; age: number };
 export function createRenderer(
   k: KAPLAYCtx,
   teamColor: string,
-  rivalTeams: readonly { color: string; name: string }[],
+  rivalTeams: readonly { color: string; name: string; tag?: string }[],
 ) {
   const c = {
     team: k.rgb(teamColor),
@@ -95,6 +95,7 @@ export function createRenderer(
   const player = { look: createContestant(k, teamColor), anim: createAnimator() };
   const rivals = rivalTeams.map((team) => ({
     color: k.rgb(team.color),
+    tag: team.tag,
     look: createContestant(k, team.color),
     anim: createAnimator(),
   }));
@@ -311,9 +312,15 @@ export function createRenderer(
       const p = w.player;
       if (!rival || w.respawnIn > 0 || p.x < left || p.x > right) return;
       rival.look.draw(rival.anim.pose(w.player, w.time, { yOffset: RIVAL_Y, opacity: RIVAL_OPACITY }));
-      // Marcador del equipo sobre la cabeza.
+      // Marcador del equipo sobre la cabeza (y el apodo, si es una persona).
       k.drawCircle({ pos: k.vec2(p.x, p.y + RIVAL_Y - 132), radius: 7, color: rival.color, outline: { width: 3, color: c.ink }, opacity: 0.9 });
+      if (rival.tag) drawTag(rival.tag, p.x, p.y + RIVAL_Y - 156);
     });
+  }
+
+  function drawTag(text: string, x: number, y: number) {
+    k.drawText({ text, pos: k.vec2(x + 2, y + 2), size: 20, font: FONT, anchor: "center", color: c.ink });
+    k.drawText({ text, pos: k.vec2(x, y), size: 20, font: FONT, anchor: "center", color: c.white });
   }
 
   function drawFlags(world: World) {

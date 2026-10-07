@@ -1,5 +1,5 @@
 import type { MinigameId } from "@/bridge/events";
-import { getTeam, type TeamId } from "./teams";
+import type { Standing } from "./participants";
 
 /** Lo que dice el presentador al presentar cada prueba. */
 const INTRO: Record<MinigameId, string> = {
@@ -13,20 +13,25 @@ export function introLine(minigameId: MinigameId, slot: number, total: number): 
   return slot === total && slot > 1 ? `${LAST} ${INTRO[minigameId]}` : INTRO[minigameId];
 }
 
-/** El comentario de la tabla, según cómo viene tu equipo. */
-export function tableLine(mine: TeamId, totals: Record<string, number>, isLast: boolean): string {
-  const ranked = (Object.keys(totals) as TeamId[]).sort((a, b) => (totals[b] ?? 0) - (totals[a] ?? 0));
-  const leader = ranked[0] ?? mine;
-  const leaderName = getTeam(leader).name;
-  const mineName = getTeam(mine).name;
-  const gap = (totals[leader] ?? 0) - (totals[mine] ?? 0);
+/**
+ * El comentario de la tabla, según cómo venís. `table` va ordenada (primero
+ * el que más tiene). Jugando solo los nombres son de equipos; online, apodos.
+ */
+export function tableLine(table: readonly Standing[], isLast: boolean): string {
+  const leader = table[0];
+  const mine = table.find((row) => row.participant.kind === "me") ?? leader;
+  if (!leader || !mine) return "";
+  const leaderName = leader.participant.name;
+  const mineName = mine.participant.name;
+  const gap = leader.total - mine.total;
+  const first = leader === mine;
 
   if (isLast) {
-    return leader === mine
-      ? `¡Ganó ${mineName}! ¡Qué equipazo, señoras y señores!`
+    return first
+      ? `¡Ganó ${mineName}! ¡Un aplauso enorme, señoras y señores!`
       : `¡Ganó ${leaderName}! Aplausos para ${mineName}... y revancha mañana.`;
   }
-  if (leader === mine) return `¡${mineName} va primero! ¿Alguien los para?`;
+  if (first) return `¡${mineName} va primero! ¿Quién lo frena?`;
   if (gap <= 150) return `¡Peleadísimo! ${leaderName} arriba por apenas ${gap} puntos.`;
   return `¡${leaderName} se escapa! A remontar, ${mineName}.`;
 }

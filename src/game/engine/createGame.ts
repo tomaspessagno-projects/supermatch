@@ -5,6 +5,8 @@ import type {
   GameEvent,
   GameHandle,
   MinigameId,
+  NetLink,
+  RivalSpec,
   TeamInfo,
 } from "../contract";
 import { registerRollingLog, ROLLING_LOG_SCENE } from "../scenes/rolling-log";
@@ -26,7 +28,8 @@ const SCENE_BY_MINIGAME: Record<MinigameId, string> = {
 export type CreateGameOptions = {
   root: HTMLElement;
   team: TeamInfo;
-  rivals: readonly TeamInfo[];
+  rivals: readonly RivalSpec[];
+  net?: NetLink;
   emit: (event: GameEvent) => void;
   muted: boolean;
 };
@@ -35,6 +38,7 @@ export function createGame({
   root,
   team,
   rivals,
+  net,
   emit,
   muted,
 }: CreateGameOptions): GameHandle {
@@ -61,6 +65,7 @@ export function createGame({
   const ctx: SceneContext = {
     team,
     rivals,
+    net,
     emit,
     audio,
     onGo: (action) => {
@@ -86,6 +91,7 @@ export function createGame({
           k.go(SCENE_BY_MINIGAME[command.minigameId], {
             slot: command.slot,
             minigameId: command.minigameId,
+            seed: command.seed,
           });
           break;
         case "minigame:count":

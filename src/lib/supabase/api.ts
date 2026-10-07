@@ -97,3 +97,29 @@ export function subscribeTeamTotals(onChange: (total: TeamTotal) => void): () =>
     void db.removeChannel(channel);
   };
 }
+
+/** Misión del día de un equipo: objetivo común de todos los de ese color. */
+export type Mission = { team: TeamId; progress: number; target: number; completed: boolean };
+
+export async function fetchMissions(): Promise<Mission[]> {
+  const { data, error } = await supabase().rpc("today_missions");
+  if (error) throw error;
+  return data.map((row) => ({
+    team: row.team_id as TeamId,
+    progress: row.progress,
+    target: row.target,
+    completed: row.completed_at !== null,
+  }));
+}
+
+/** Avisa cuando cambia alguna misión (para volver a pedirlas). */
+export function subscribeMissions(onChange: () => void): () => void {
+  const db = supabase();
+  const channel = db
+    .channel("team_missions")
+    .on("postgres_changes", { event: "*", schema: "public", table: "team_missions" }, () => onChange())
+    .subscribe();
+  return () => {
+    void db.removeChannel(channel);
+  };
+}

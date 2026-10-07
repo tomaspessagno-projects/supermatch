@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TeamLeaderboard } from "@/components/leaderboard/TeamLeaderboard";
+import { MissionBoard } from "@/components/mission/MissionBoard";
 
 export default function LeaderboardPage() {
   return (
@@ -10,6 +11,7 @@ export default function LeaderboardPage() {
           <span className="size-2 animate-pulse rounded-full bg-red-500" /> En vivo: cada partida suma a su equipo
         </p>
       </div>
+      <MissionBoard />
       <TeamLeaderboard />
       <Link href="/" className="btn-chunky bg-sun px-6 py-3 font-display text-xl text-ink">
         Jugar

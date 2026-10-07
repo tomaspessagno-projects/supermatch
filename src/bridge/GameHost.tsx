@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { GameEvent, GameHandle } from "@/game/contract";
-import { TEAMS, type TeamId } from "@/lib/teams";
+import type { GameEvent, GameHandle, RivalSpec } from "@/game/contract";
+import { shortTeamName } from "@/lib/participants";
+import { getTeam, type TeamId } from "@/lib/teams";
+import { netLink, reportResult } from "@/online/room";
 import { nextMinigame, useSession } from "@/store/session";
 import { setActiveGame } from "./input";
 
@@ -21,7 +23,8 @@ type GameHostProps = {
  *
  * El efecto corre en cada montaje y también cada vez que Next vuelve a mostrar
  * la ruta (cacheComponents la oculta con <Activity> en vez de desmontarla):
- * cada vez arranca un episodio nuevo.
+ * cada vez arranca un episodio nuevo. Online, los participantes y la semilla
+ * ya los dejó la sala.
  */
 export function GameHost({ team }: GameHostProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -42,6 +45,7 @@ export function GameHost({ team }: GameHostProps) {
           break;
         case "minigame:finished":
           session().recordResult(event.result, event.rivals);
+          if (session().mode === "online") reportResult(event.result, event.rivals);
           break;
       }
     }
@@ -55,22 +59,33 @@ export function GameHost({ team }: GameHostProps) {
     ]).then(([{ createGame }]) => {
       if (disposed) return;
       session().startRun();
-      const info = (id: string) => {
-        const t = TEAMS.find((t) => t.id === id)!;
-        return { id, color: t.color, name: t.name.replace(/^Equipo /, "") };
-      };
+      const { mode, participants, seed } = session();
+      const info = (id: TeamId) => ({ id, color: getTeam(id).color, name: shortTeamName(id) });
+      // Los bots se nombran por su color; las personas, por su apodo.
+      const rivals: RivalSpec[] = participants
+        .filter((p) => p.kind !== "me")
+        .map((p) => ({
+          id: p.id,
+          team: info(p.team),
+          name: p.kind === "bot" ? shortTeamName(p.team) : p.name,
+          control: p.kind === "bot" ? "bot" : "remote",
+        }));
       const current = createGame({
         root,
         team: info(team),
-        rivals: TEAMS.filter((t) => t.id !== team).map((t) => info(t.id)),
+        rivals,
+        net: mode === "online" ? netLink : undefined,
         emit: onGameEvent,
         muted: session().muted,
       });
       game = current;
       setActiveGame(current);
 
-      const first = nextMinigame([]);
+      const first = nextMinigame([], seed);
       if (first) current.send({ type: "minigame:start", ...first });
+      // Online la cuenta corre con el reloj de la sala: si el juego tardó en
+      // cargar, puede que el silbato ya haya sonado.
+      if (session().phase === "playing") current.send({ type: "minigame:go" });
 
       unsubscribe = useSession.subscribe((state, prev) => {
         if (state.phase === "playing" && prev.phase !== "playing") {
@@ -78,7 +93,7 @@ export function GameHost({ team }: GameHostProps) {
           current.focus();
         }
         if (state.phase === "intro" && prev.phase === "between") {
-          const next = nextMinigame(state.results);
+          const next = nextMinigame(state.results, state.seed);
           if (next) current.send({ type: "minigame:start", ...next });
         }
         if (state.muted !== prev.muted) current.send({ type: "mute", muted: state.muted });

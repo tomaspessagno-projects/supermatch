@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { TeamPicker } from "@/components/TeamPicker";
+import { PlayMenu } from "@/components/home/PlayMenu";
+import { MissionBoard } from "@/components/mission/MissionBoard";
 
 export default function Home() {
   return (
@@ -29,8 +30,9 @@ export default function Home() {
           priority
           className="h-56 w-auto animate-wobble drop-shadow-[0_10px_0_rgb(31_17_71/0.6)] sm:h-80"
         />
-        <TeamPicker />
+        <PlayMenu />
       </div>
+      <MissionBoard compact />
       <Link href="/leaderboard" className="font-display text-lg text-water underline-offset-4 hover:underline">
         Ver el ranking en vivo →
       </Link>

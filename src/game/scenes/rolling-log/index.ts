@@ -1,8 +1,9 @@
 import type { KAPLAYCtx } from "kaplay";
 import type { MinigameStart } from "../../contract";
+import { createRivals, rivalLooks } from "../../engine/rivals";
 import type { SceneContext } from "../../engine/scene";
 import { createTimeFx, type TimeFx } from "../../engine/timefx";
-import { BOT_SKILLS, createBot, rivalScore, stepBot } from "./bot";
+import { BOT_SKILLS, createBot, rivalScore } from "./bot";
 import { LOG_LEVEL } from "./level";
 import { createRenderer } from "./render";
 import { createWorld, score, type SimEvent, step } from "./sim";
@@ -14,6 +15,9 @@ export const ROLLING_LOG_SCENE = "rolling_log";
 const STEP = 1 / 120;
 const MAX_FRAME = 0.1;
 const SCORE_EMIT_INTERVAL = 0.1;
+
+// Orden de habilidad que usa createRivals (0 = el mejor).
+const BOT_LEVELS = [BOT_SKILLS.ace, BOT_SKILLS.average, BOT_SKILLS.clumsy];
 
 const KEYS = {
   left: ["left", "a"],
@@ -70,21 +74,24 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
     }
   }
 
-  k.scene(ROLLING_LOG_SCENE, ({ slot, minigameId }: MinigameStart) => {
+  k.scene(ROLLING_LOG_SCENE, ({ slot, minigameId, seed }: MinigameStart) => {
     const world = createWorld(LOG_LEVEL);
 
-    const skills = [BOT_SKILLS.ace, BOT_SKILLS.average, BOT_SKILLS.clumsy].sort(() => Math.random() - 0.5);
-    const seed = Math.floor(Math.random() * 2 ** 31);
-    const rivals = ctx.rivals.map((team, i) => ({
-      team,
-      world: createWorld(LOG_LEVEL),
-      bot: createBot(skills[i % skills.length], seed + i),
-    }));
-
-    const renderer = createRenderer(k, ctx.team.color, rivals.map((r) => r.team));
+    const rivals = createRivals({
+      specs: ctx.rivals,
+      seed,
+      slot,
+      net: ctx.net,
+      createWorld: () => createWorld(LOG_LEVEL),
+      createBot: (level, botSeed) => createBot(BOT_LEVELS[level], botSeed),
+      step: (w, input) => step(w, input, STEP),
+    });
+    const rivalWorlds = rivals.runners.map((r) => r.world);
+    const renderer = createRenderer(k, ctx.team.color, rivalLooks(ctx.rivals));
     const time = createTimeFx();
     let started = false;
     let accumulator = 0;
+    let tick = 0; // pasos de simulación del jugador en esta prueba
     let jumpQueued = false;
     let lastScore = 0;
     let lastScoreAt = -Infinity;
@@ -111,16 +118,20 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
         accumulator += dt;
         while (accumulator >= STEP) {
           accumulator -= STEP;
-          const events = step(world, { move, jumpPressed: jumpQueued }, STEP);
+          const input = { move, jumpPressed: jumpQueued };
+          ctx.net?.sendInput(slot, tick, input);
+          const events = step(world, input, STEP);
+          tick++;
           renderer.react(events, world);
           feel(events, time);
           jumpQueued = false;
-          rivals.forEach((r, i) => renderer.reactRival(i, stepBot(r.world, r.bot), r.world));
+          rivals.stepBots((i, rivalEvents, w) => renderer.reactRival(i, rivalEvents, w));
         }
+        rivals.stepRemotes(tick, (i, rivalEvents, w) => renderer.reactRival(i, rivalEvents, w));
       } else {
         jumpQueued = false;
       }
-      renderer.update(started ? dt : k.dt(), world, rivals.map((r) => r.world), started ? move : 0);
+      renderer.update(started ? dt : k.dt(), world, rivalWorlds, started ? move : 0);
 
       const current = score(world);
       if (current !== lastScore && world.time - lastScoreAt >= SCORE_EMIT_INTERVAL) {
@@ -134,11 +145,11 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
         ctx.emit({
           type: "minigame:finished",
           result: { slot, minigameId, score: score(world), durationMs: Math.round(world.endedAt * 1000) },
-          rivals: rivals.map((r) => ({ teamId: r.team.id, score: rivalScore(r.world) })),
+          rivals: rivals.runners.map((r) => ({ id: r.spec.id, score: rivalScore(r.world) })),
         });
       }
     });
 
-    k.add([{ id: "rolling-log-view", draw: () => renderer.draw(world, rivals.map((r) => r.world)) }]);
+    k.add([{ id: "rolling-log-view", draw: () => renderer.draw(world, rivalWorlds) }]);
   });
 }
