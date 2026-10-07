@@ -233,6 +233,75 @@ Action: the character waves at the viewer with one gloved hand, bounces happily 
 Animate this exact 2D cartoon TV studio background without changing its framing or style. Static locked-off camera: no zoom, no pan. The colored spotlights slowly sweep left and right, the crowd silhouettes cheer and wave their arms, confetti falls gently and the giant screens shimmer. The bottom third stays dark and empty. Seamless loop. Crowd cheering ambience sound, no music.
 ```
 
+
+## Pruebas nuevas y show (ver docs/GAME_DESIGN.md)
+
+Imágenes (no video). Mismas reglas: fondo verde plano, vista lateral, sin texto.
+
+### Baldes al Tanque (16:9) — **props-baldes.png**
+
+```
+Props sheet for a 2D side-scrolling TV game-show obstacle course. Each object isolated with generous empty space between them, nothing overlapping:
+1. a dented metal bucket seen from the side with a handle, EMPTY (no water inside)
+2. a cheerful cartoon fountain spouting a column of cyan (#22D3EE) water, side view
+3. a tall glass water tank seen from the front, EMPTY, with big measuring tick marks on the side and a thick white frame; draw the glass only as an outline with a few reflections
+4. a giant soft foam hammer hanging from a rope, pink (#F472B6) with yellow (#FACC15) stripes
+5. an inflatable step block with red and white stripes
+6. a short soapy puddle seen from the side, cyan water with white foam
+Style: 2D cartoon game art for a goofy TV game-show party game. Thick dark-purple outlines (#1F1147), flat saturated colors with a single soft cel-shading tone, chunky rounded shapes, clean vector look. No text, no watermark.
+Isolated on a perfectly flat pure green (#00FF00) background with no shadows and no gradient; nothing touching the image edges; do not use green anywhere on the objects.
+```
+
+### El Tronco Loco (16:9) — **props-tronco.png**
+
+```
+Props sheet for a 2D side-scrolling TV game-show obstacle course. Each object isolated with generous empty space between them, nothing overlapping:
+1. a giant wooden log seen straight-on from its end: a perfect circle with tree rings, a thick bark rim and a few knots
+2. a sturdy wooden A-frame stand that holds the log, side view
+3. a cartoon foam-ball cannon, pink (#F472B6), side view, barrel pointing LEFT
+4. a big soft foam ball, yellow (#FACC15)
+5. a golden floating bubble with a shine, bonus pickup
+6. a giant inflatable rubber duck, decoration
+Style: 2D cartoon game art for a goofy TV game-show party game. Thick dark-purple outlines (#1F1147), flat saturated colors with a single soft cel-shading tone, chunky rounded shapes, clean vector look. No text, no watermark.
+Isolated on a perfectly flat pure green (#00FF00) background with no shadows and no gradient; nothing touching the image edges; do not use green anywhere on the objects.
+```
+
+### Puente v2 (16:9) — **props-puente-v2.png**
+
+```
+Props sheet for a 2D side-scrolling TV game-show obstacle course. Each object isolated with generous empty space between them, nothing overlapping:
+1. an inflatable trampoline pad, side view, pink and yellow stripes
+2. a conveyor belt segment seen exactly from the side: gray rubber belt with yellow arrow marks pointing LEFT, rollers visible; it must tile seamlessly left to right
+3. a checkpoint flag on a short pole: white flag with a black-and-white checkered border, no text
+4. a golden soap bubble pickup with a sparkle
+5. a big swinging foam pendulum hammer on a long rope, pink and yellow
+6. a giant inflatable shark, decoration
+Style: 2D cartoon game art for a goofy TV game-show party game. Thick dark-purple outlines (#1F1147), flat saturated colors with a single soft cel-shading tone, chunky rounded shapes, clean vector look. No text, no watermark.
+Isolated on a perfectly flat pure green (#00FF00) background with no shadows and no gradient; nothing touching the image edges; do not use green anywhere on the objects.
+```
+
+### Presentador/a (16:9) — **presentador.png**
+
+```
+Character design sheet of an original cheerful TV game-show host for a 2D party game. Big expressive face, flashy sequined purple jacket, huge hair, holding a microphone, very energetic pose. Show side by side at the same scale: front view, 3/4 view, and below two head close-ups of the same character: smiling with mouth closed, and talking with mouth wide open.
+Style: 2D cartoon game art for a goofy TV game-show party game. Thick dark-purple outlines (#1F1147), flat saturated colors with a single soft cel-shading tone, chunky rounded shapes, clean vector look. No text, no watermark.
+Isolated on a perfectly flat pure green (#00FF00) background with no shadows and no gradient; nothing touching the image edges; do not use green anywhere on the objects.
+```
+
+### Árbitro (16:9) — **arbitro.png**
+
+```
+Character design sheet of an original game-show referee for a 2D party game: black-and-white striped shirt, cap, whistle on a cord, chunky sneakers, comically serious face. Show side by side at the same scale: front view blowing the whistle, side view facing RIGHT holding up a red card, and side view waving a checkered flag.
+Style: 2D cartoon game art for a goofy TV game-show party game. Thick dark-purple outlines (#1F1147), flat saturated colors with a single soft cel-shading tone, chunky rounded shapes, clean vector look. No text, no watermark.
+Isolated on a perfectly flat pure green (#00FF00) background with no shadows and no gradient; nothing touching the image edges; do not use green anywhere on the objects.
+```
+
+### Música (video, solo se usa el audio) — **musica.mp4**
+
+```
+A simple looping animation of a spinning disco ball on a flat pure green (#00FF00) background, static camera. Audio: upbeat, goofy TV game-show music with brass, drums and claps, energetic, no vocals, loops seamlessly.
+```
+
 ## Pipeline
 
 Las hojas originales viven en `art/source/` con el nombre de cada prompt

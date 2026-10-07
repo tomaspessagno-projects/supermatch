@@ -19,6 +19,7 @@ python3 scripts/process_art.py   # regenera los sprites desde art/source/
 
 ## Docs
 
+- [Diseño de juego y plan de ejecución](docs/GAME_DESIGN.md)
 - [Arquitectura, decisiones y trampas conocidas](docs/ARCHITECTURE.md)
 - [Dirección de arte y prompts de imágenes](docs/ART_DIRECTION.md)
 - [Migraciones de base de datos](supabase/migrations/)
