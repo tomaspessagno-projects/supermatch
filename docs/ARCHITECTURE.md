@@ -5,7 +5,8 @@
 | Tema | Decisión |
 |---|---|
 | Motor 2D | **KAPLAY** 3001 (fork mantenido de Kaboom.js, misma API) |
-| Ragdoll | **Falso**: inercia, fricción y rebotes propios en `physics.ts`, y el ragdoll se simula con rotación y tambaleo. Sin motor de cuerpos rígidos |
+| Ragdoll | **Falso**: un resorte inclina el torso, da vueltas en el aire tras un golpe y rebota como goma. Sin motor de cuerpos rígidos |
+| Física | **Simulación propia por minijuego**: TypeScript puro, determinista, paso fijo de 120 Hz. KAPLAY solo lee input y dibuja |
 | Facción | **Bloqueada** una vez elegida (en el store y en la base) |
 | Auth | Supabase Anonymous Sign-in |
 | Escritura de puntajes | Solo vía RPC `start_run` / `finish_run` |
@@ -48,11 +49,16 @@ supermatch/
 │   │   ├── contract.ts               # GameEvent (juego→UI), GameCommand (UI→juego), GameHandle
 │   │   ├── engine/
 │   │   │   ├── createGame.ts         # Crea/destruye la instancia de KAPLAY
-│   │   │   └── physics.ts            # (pendiente) Inercia, fricción, rebote, impulsos
-│   │   ├── components/               # (pendiente) slippery(), bouncy(), wobble()
+│   │   │   ├── physics.ts            # Helpers puros: approach, spring, colisiones
+│   │   │   └── fx.ts                 # Partículas y carteles ("¡BOING!")
 │   │   └── scenes/
-│   │       ├── placeholder.ts        # Temporal: prueba el contrato sin jugabilidad
-│   │       └── slippery-bridge/      # (pendiente) Minijuego 1
+│   │       └── slippery-bridge/      # Minijuego 1: El Puente Resbaladizo
+│   │           ├── tuning.ts         # Todas las perillas de feel
+│   │           ├── level.ts          # Layout fijo (charcos, rodillos, meta)
+│   │           ├── sim.ts            # Simulación pura: step(world, input, dt)
+│   │           ├── sim.test.ts       # El feel y las reglas, como tests
+│   │           ├── render.ts         # Dibuja el estado (cámara, ragdoll, efectos)
+│   │           └── index.ts          # Escena KAPLAY: input + paso fijo + render
 │   │
 │   ├── bridge/                       # Único punto de contacto React ⇄ KAPLAY
 │   │   ├── GameHost.tsx              # Monta el juego y traduce eventos ⇄ store
@@ -82,12 +88,45 @@ Las fuerza ESLint (`no-restricted-imports` en `eslint.config.mjs`):
 1. Landing: el jugador elige facción (queda bloqueada) y navega a `/play`.
 2. `GameHost` importa el motor, resetea el run en el store y manda
    `minigame:start { slot: 1 }`.
-3. Durante el minijuego el juego emite `minigame:score` (HUD en vivo). Al terminar emite
+3. Durante el minijuego el juego emite `minigame:score` (HUD en vivo, como mucho 10 por
+   segundo). Al terminar (y después de `endDelay` para ver el desenlace) emite
    `minigame:finished { result }`. El bridge lo guarda y manda el siguiente slot según
    `RUN_PLAYLIST`.
 4. Tras el tercero, `GameHost` llama a `onRunFinished` y se navega a `/results`.
 5. *(pendiente)* `/results` llama a `start_run` / `finish_run` en Supabase.
 6. *(pendiente)* `/leaderboard` escucha UPDATEs de `team_totals` por Realtime.
+
+## Minijuegos: simulación pura + render
+
+Cada minijuego separa **qué pasa** de **cómo se ve**:
+
+- `sim.ts` es TypeScript puro y determinista: `step(world, input, dt)` muta el mundo y
+  devuelve eventos (`jump`, `land`, `bonk`, `splash`…). No importa KAPLAY.
+- `render.ts` dibuja el estado y reacciona a los eventos con efectos (partículas,
+  sacudón de cámara, carteles). Nunca modifica el mundo.
+- `index.ts` (la escena) lee el teclado, avanza la simulación a paso fijo de 120 Hz y
+  emite los eventos del contrato.
+
+Así el feel se puede testear sin navegador, el resultado no depende de los FPS del
+jugador y, más adelante, una partida se podría re-simular en el servidor a partir del
+input grabado.
+
+### Cómo ajustar el feel
+
+1. Cambiá números en `tuning.ts` (o el layout en `level.ts`).
+2. Corré `npm test`. Los tests de `sim.test.ts` codifican la intención del diseño:
+   - patina (conserva más del 90 % de la velocidad 1 s después de soltar);
+   - frena mal (más de 0,8 s para frenar desde la velocidad máxima);
+   - cae de pie sin rebotar, pero el ragdoll rebota como goma;
+   - un rodillo a toda velocidad te salva si seguís apretando y te tira al agua si soltás;
+   - un bot planificador puede cruzar el puente (imprime tiempo, puntaje y golpes);
+   - con input aleatorio no explota, no hay pinball infinito y se respetan
+     `max_score` / `min_duration_ms` del servidor.
+3. Si un test falla, decidí si cambió la intención (se actualiza el test) o si el cambio
+   rompió el feel (se revierte el número).
+
+`SERVER_LIMITS` en `tuning.ts` es espejo de `public.minigames`: si cambia, va una
+migración nueva.
 
 ## Trampas conocidas (verificadas)
 
@@ -113,6 +152,12 @@ Las fuerza ESLint (`no-restricted-imports` en `eslint.config.mjs`):
 - El motor se carga con `import()` dentro del efecto. No entra al render del servidor y,
   como el arranque es asíncrono, el doble montaje de StrictMode se cancela antes de crear
   una segunda instancia.
+- Rotaciones (`pushRotate`, `angle`) en grados. Los `draw*` aplican la cámara salvo con
+  `fixed: true` (útil para overlays).
+- Para dibujar por escena se usa un game object con `draw()`: se destruye solo al cambiar
+  de escena.
+- `outline` en `drawText` se ignora (el contorno de texto se define al cargar la fuente):
+  para carteles legibles se dibuja una sombra desplazada.
 
 **Anti-trampas**
 - Cualquier puntaje que calcula el cliente se puede falsificar. Las RPCs ponen topes de

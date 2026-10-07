@@ -6,16 +6,15 @@ import type {
   MinigameId,
 } from "../contract";
 import {
-  PLACEHOLDER_SCENE,
-  registerPlaceholderScene,
-} from "../scenes/placeholder";
+  registerSlipperyBridge,
+  SLIPPERY_BRIDGE_SCENE,
+} from "../scenes/slippery-bridge";
 
 const GAME_WIDTH = 1280;
 const GAME_HEIGHT = 720;
 
-// Hasta que exista cada minijuego, todos caen en el placeholder.
 const SCENE_BY_MINIGAME: Record<MinigameId, string> = {
-  slippery_bridge: PLACEHOLDER_SCENE,
+  slippery_bridge: SLIPPERY_BRIDGE_SCENE,
 };
 
 export type CreateGameOptions = {
@@ -43,7 +42,7 @@ export function createGame({
     background: "#1a1033",
   });
 
-  registerPlaceholderScene(k, { teamColor, emit });
+  registerSlipperyBridge(k, { teamColor, emit });
 
   return {
     send(command: GameCommand) {

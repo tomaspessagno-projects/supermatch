@@ -12,10 +12,11 @@ minijuegos seguidos y tu puntaje suma al leaderboard global de tu color.
 npm install
 npm run dev      # http://localhost:3000
 npm run lint     # incluye las fronteras React ⇄ KAPLAY
+npm test         # física y reglas de los minijuegos (sin navegador)
 npm run build
 ```
 
 ## Docs
 
 - [Arquitectura, decisiones y trampas conocidas](docs/ARCHITECTURE.md)
-- [Esquema inicial de base de datos](supabase/migrations/20261007000000_init.sql)
+- [Migraciones de base de datos](supabase/migrations/)
