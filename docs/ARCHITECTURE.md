@@ -38,7 +38,7 @@ supermatch/
 │   │   ├── results/
 │   │   │   ├── page.tsx
 │   │   │   └── ResultsSummary.tsx
-│   │   └── leaderboard/              # (pendiente) SSR inicial + Realtime
+│   │   └── leaderboard/page.tsx      # Ranking por equipo en vivo
 │   │
 │   ├── components/
 │   │   ├── ui/                       # (pendiente) Exportados de Figma
@@ -72,7 +72,10 @@ supermatch/
 │   └── lib/
 │       ├── teams.ts                  # Facciones (espejo de public.teams)
 │       ├── minigames.ts              # Nombres de los minijuegos para la UI
-│       └── supabase/                 # (pendiente)
+│       ├── nicknames.ts              # Apodo al azar ("Pato Resbaloso")
+│       └── supabase/
+│           ├── client.ts             # Cliente del navegador (URL + publishable key)
+│           └── api.ts                # loadProfile, joinTeam, startRun, finishRun, ranking
 │
 ├── art/source/                       # Hojas originales generadas (fuente de verdad del arte)
 ├── scripts/process_art.py            # Hojas → sprites recortados + manifiesto
@@ -93,16 +96,39 @@ Las fuerza ESLint (`no-restricted-imports` en `eslint.config.mjs`):
 
 ## Flujo de un run
 
-1. Landing: el jugador elige facción (queda bloqueada) y navega a `/play`.
+1. Landing: si el navegador ya tiene sesión, se carga el perfil (equipo bloqueado y
+   apodo). Si no, al elegir facción se crea una sesión anónima y el perfil
+   (`players`) con un apodo al azar. La base no deja cambiar el equipo después.
 2. `GameHost` importa el motor, resetea el run en el store y manda
-   `minigame:start { slot: 1 }`.
+   `minigame:start { slot: 1 }`. En paralelo, el store llama a `start_run()`
+   (el servidor fija la hora de inicio).
 3. Durante el minijuego el juego emite `minigame:score` (HUD en vivo, como mucho 10 por
    segundo). Al terminar (y después de `endDelay` para ver el desenlace) emite
    `minigame:finished { result }`. El bridge lo guarda y manda el siguiente slot según
    `RUN_PLAYLIST`.
 4. Tras el tercero, `GameHost` llama a `onRunFinished` y se navega a `/results`.
-5. *(pendiente)* `/results` llama a `start_run` / `finish_run` en Supabase.
-6. *(pendiente)* `/leaderboard` escucha UPDATEs de `team_totals` por Realtime.
+5. `/results` llama una sola vez a `finish_run(run_id, results)`: la base valida y suma
+   al equipo en la misma transacción. Volver a mostrar la pantalla no reenvía.
+6. `/leaderboard` lee `team_totals` y escucha sus UPDATEs por Realtime.
+
+**Sin conexión:** si Supabase no responde, se juega igual. El run no suma y la
+pantalla de resultados lo avisa.
+
+## Infraestructura
+
+| Pieza | Dónde |
+|---|---|
+| Supabase | Proyecto `supermatch` (ref `qhbvhefrcijtnaurnoxn`), región `sa-east-1`, plan gratuito |
+| Migraciones | `supabase/migrations/`, ya aplicadas al proyecto |
+| Credenciales del cliente | URL + publishable key en `src/lib/supabase/client.ts` (públicas por diseño; se pueden pisar con `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) |
+| Login anónimo | Se activa en el panel: Authentication → Sign In / Providers → Anonymous sign-ins |
+
+La secret key (ex *service_role*) no se usa en ningún lado: todo lo que escribe el
+cliente pasa por RLS o por las RPC `start_run` / `finish_run`.
+
+Supabase limita los logins anónimos a 30 por hora por IP (ajustable en
+Authentication → Rate Limits). Antes de un lanzamiento grande conviene sumar CAPTCHA
+(Turnstile) para que no se llene la base de usuarios falsos.
 
 ## Minijuegos: simulación pura + render
 

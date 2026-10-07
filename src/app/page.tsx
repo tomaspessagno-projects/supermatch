@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { TeamPicker } from "@/components/TeamPicker";
 
 export default function Home() {
@@ -21,6 +22,9 @@ export default function Home() {
         />
         <TeamPicker />
       </div>
+      <Link href="/leaderboard" className="font-display text-lg text-water underline-offset-4 hover:underline">
+        Ver el ranking en vivo →
+      </Link>
     </main>
   );
 }

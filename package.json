@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "kaplay": "^3001.0.19",
     "next": "16.4.0",
     "react": "19.3.0",
