@@ -1,5 +1,8 @@
 import { getTeam, TEAMS, type TeamId } from "./teams";
 
+/** Carrera: cada uno contra los otros tres. En equipo: los 4 juntos (El Colchón). */
+export type EpisodeKind = "race" | "coop";
+
 /** Uno de los 4 concursantes de un episodio: vos, una persona remota o un bot. */
 export type Participant = {
   id: string;
@@ -41,3 +44,16 @@ export function standings(participants: readonly Participant[], scores: Scores, 
     .sort((a, b) => b.total - a.total || a.index - b.index)
     .map(({ participant, total, gained }) => ({ participant, total, gained }));
 }
+
+export type Medal = "gold" | "silver" | "bronze" | null;
+
+/** Medalla de una ronda en equipo (0..1000 puntos). */
+export function medalFor(score: number): Medal {
+  if (score >= 750) return "gold";
+  if (score >= 550) return "silver";
+  if (score >= 350) return "bronze";
+  return null;
+}
+
+export const MEDAL_LABEL: Record<NonNullable<Medal>, string> = { gold: "ORO", silver: "PLATA", bronze: "BRONCE" };
+export const MEDAL_ICON: Record<NonNullable<Medal>, string> = { gold: "🥇", silver: "🥈", bronze: "🥉" };

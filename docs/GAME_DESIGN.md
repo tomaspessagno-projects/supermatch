@@ -285,6 +285,18 @@ Diagnóstico después de la Fase 1, el Tronco y el Puente v2:
 - Brazos en molino al patinar sin control, festejo al ganar y reaparición cayendo
   desde arriba de la bandera.
 
+### Hecho en la pasada de fluidez
+
+- Rodillas y codos: piernas y brazos se dibujan en dos tramos (misma pieza cortada),
+  con articulación redonda que tapa la costura.
+- La zancada crece y se apaga con la velocidad (antes el personaje quedaba congelado
+  a mitad de paso), el cuerpo sube y baja al correr y respira quieto.
+- En el aire recoge las rodillas al subir y las estira al bajar; al aterrizar se agacha.
+- El jugador se dibuja entre dos pasos de la simulación: sin saltitos en pantallas de
+  90 o 144 Hz.
+- Los carteles del programa entran con un rebotito y las filas de la tabla de a una;
+  el puntaje de la ronda en equipo cuenta para arriba.
+
 ### Orden propuesto
 
 1. **Audios de Flow** (efectos, música, voces del presentador): el mayor salto de
@@ -303,6 +315,7 @@ de 3 pruebas, y una meta compartida:
 
 | Modo | Qué es | Para quién |
 |---|---|---|
+| **En equipo** | El Colchón: los 4 juntos (con la compu, online o con amigos), ver §14 | Colaborar de verdad, en la misma pista |
 | **Jugar solo** | Vos contra 3 bots (uno de cada otro color, con niveles mezclados en cada prueba) | Para jugar ya, sin esperar a nadie |
 | **Carrera online** | En vivo contra hasta 3 personas al azar; si faltan, completan bots | La emoción de ganarle a alguien real |
 | **Con amigos** | Sala con código o link; el anfitrión arranca y puede pedir revancha | Juntadas, grupos de WhatsApp |
@@ -321,9 +334,45 @@ de 3 pruebas, y una meta compartida:
 
 **Lo que sigue (online)**
 
-1. **Pruebas cooperativas en sala**: la red ya sirve para que varios controlen
-   cosas en la misma pista (por ejemplo, *El Colchón*: dos sostienen una lona y
-   tienen que atajar a los que caen; o *Baldes al Tanque* por parejas, uno carga
-   y otro estabiliza).
+1. Más pruebas en equipo sobre el mismo motor (rollback): *Baldes al Tanque* por
+   parejas (uno carga, otro estabiliza), *La Escalera* (dos sostienen, uno sube).
 2. Reacciones rápidas en la tabla (😂 👏 💦) para hablar sin chat.
 3. Revancha automática: si todos vuelven a la sala, arranca sola.
+
+## 14. El Colchón (en equipo)
+
+**Idea:** como el Game & Watch *Fire*, pero en un programa de agua y entre cuatro.
+Desde una torre se tiran concursantes; dos colchones inflables, cada uno llevado por
+dos portadores sobre una pasarela flotante, los hacen rebotar de colchón en colchón
+hasta el pelotero. El que no se ataja, al agua.
+
+**Por qué es cooperativo de verdad:**
+
+- **Llevar entre dos:** los portadores de un colchón no se pueden alejar ni juntar
+  de más. Si uno tira para un lado y el otro para el otro, no se mueven (tironeo);
+  si uno va y el otro no, lo arrastra a medias.
+- **Súper rebote:** si los dos saltan juntos (menos de 0,18 s de diferencia) justo
+  cuando cae alguien, sale con súper rebote. Desde el primer colchón llega **directo**
+  al pelotero (bonus). Un anillo que se cierra sobre el colchón marca el momento
+  (verde = ¡ya!).
+- **Posta:** el primer colchón le pasa al segundo. Dónde cae sobre el colchón y la
+  inclinación (si uno saltó o está tirado) cambian hacia dónde sale: el otro par
+  tiene que leerlo y moverse.
+
+**Las 3 rondas (minipruebas), una por prueba del episodio:**
+
+| Ronda | Nombre | Vuelta de tuerca |
+|---|---|---|
+| 1 | ¡Atajalos! | Uno por vez, para aprender a atajar y a saltar juntos |
+| 2 | Lluvia de globos | Globos de agua: en el colchón lo empapan (los dos van más lentos 1,3 s); en la cabeza, tiran al portador. Más saltadores, a veces de a dos, y dorados que valen más |
+| 3 | La barrera | Rodillos que cruzan la pasarela: hay que saltarlos sin soltar el colchón (el que se cae suelta su punta y el colchón se inclina). Charcos de jabón: cuesta frenar |
+
+**Puntaje (de los 4, tope 1000 por ronda):** rebote 5, súper rebote 15, llegada 35
+(+40 dorado, +15 directo) y racha +5 por llegada seguida (hasta +15). Medallas por
+ronda: bronce 350, plata 550, oro 750. Calibración (4 bots, 8 semillas): ronda 1 ≈ 615,
+ronda 2 ≈ 840, ronda 3 ≈ 710; sin que nadie se mueva, ≈ 200–270.
+
+**Bots compañeros:** calculan dónde va a caer el próximo (sin trigonometría, igual en
+todas las compus), se acomodan con un poco de error y de reacción, deciden una vez por
+saltador si bombean para el súper rebote (55 %) y saltan los rodillos casi siempre.
+Si tu compañero es un bot, salta en el momento justo: seguile el ritmo.

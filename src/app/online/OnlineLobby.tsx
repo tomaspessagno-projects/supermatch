@@ -16,6 +16,8 @@ import {
   leaveRoom,
   lobbyMembers,
   quickMatch,
+  roomMode,
+  setRoomMode,
   startEpisode,
   useRoom,
 } from "@/online/room";
@@ -52,7 +54,7 @@ export function OnlineLobby() {
     const inRoom = room.status === "lobby" || room.status === "playing";
     if (code && room.code === code && inRoom) backToLobby();
     else if (code) void joinRoom(code);
-    else if (params.get("modo") === "rapida") void quickMatch();
+    else if (params.get("modo") === "rapida") void quickMatch(params.get("tipo") === "equipo" ? "coop" : "race");
     else if (room.status === "playing") backToLobby();
   }, [team]);
 
@@ -89,11 +91,12 @@ export function OnlineLobby() {
 
 function Menu() {
   const [code, setCode] = useState("");
+  const kind = useSession((s) => s.kind);
   const valid = normalizeCode(code).length === 5;
   return (
     <div className={CARD} data-testid="online-menu">
-      <button type="button" onClick={() => void quickMatch()} className={`${BUTTON} bg-water text-ink`}>
-        CARRERA RÁPIDA
+      <button type="button" onClick={() => void quickMatch(kind)} className={`${BUTTON} bg-water text-ink`}>
+        {kind === "coop" ? "EQUIPO RÁPIDO" : "CARRERA RÁPIDA"}
       </button>
       <button type="button" onClick={() => void createRoom()} className={`${BUTTON} bg-rubber text-ink`} data-testid="create-room">
         CREAR SALA
@@ -127,6 +130,7 @@ function Menu() {
 function Searching() {
   const router = useRouter();
   const searchingSince = useRoom((s) => s.searchingSince);
+  const coop = useRoom((s) => s.mode === "coop");
   const others = useRoom((s) => s.members.filter((m) => m.id !== s.me?.id && !m.busy).length);
   const [now, setNow] = useState(() => Date.now());
   const since = searchingSince ?? now;
@@ -139,7 +143,7 @@ function Searching() {
   return (
     <div className={`${CARD} items-center text-center`} data-testid="searching">
       <Image src="/ui/host-34.png" alt="" width={220} height={300} className="h-36 w-auto animate-wobble" />
-      <h2 className="text-cartoon text-3xl text-sun">BUSCANDO RIVALES…</h2>
+      <h2 className="text-cartoon text-3xl text-sun">{coop ? "BUSCANDO EQUIPO…" : "BUSCANDO RIVALES…"}</h2>
       <p className="text-foreground/80">
         {others > 0 ? `¡Hay ${others + 1} en la fila! Armando la carrera…` : "Esperando que aparezca alguien con ganas de mojarse."}
       </p>
@@ -176,14 +180,16 @@ function Lobby() {
   const host = isLobbyHost(members, me);
   const full = !!me && !waiting.some((m) => m.id === me.id);
   const hostName = waiting[0]?.nickname;
+  const mode = useRoom(roomMode);
 
   return (
     <div className={CARD} data-testid="lobby">
       {kind === "friends" ? (
         <RoomCode code={code ?? ""} />
       ) : (
-        <h2 className="text-cartoon text-center text-3xl text-sun">¡RIVALES ENCONTRADOS!</h2>
+        <h2 className="text-cartoon text-center text-3xl text-sun">{mode === "coop" ? "¡EQUIPO ARMADO!" : "¡RIVALES ENCONTRADOS!"}</h2>
       )}
+      {kind === "friends" && <ModeChoice mode={mode} host={host} />}
       <ol className="flex flex-col gap-2" data-testid="lobby-members">
         {Array.from({ length: MAX_PLAYERS }, (_, i) => (
           <Seat key={waiting[i]?.id ?? `free-${i}`} member={waiting[i]} me={waiting[i]?.id === me?.id} host={i === 0} />
@@ -208,6 +214,40 @@ function Lobby() {
       <button type="button" onClick={() => void leaveRoom()} className="text-foreground/70 underline-offset-4 hover:underline">
         Salir de la sala
       </button>
+    </div>
+  );
+}
+
+/** Carrera o en equipo: lo elige el anfitrión, los demás lo ven. */
+function ModeChoice({ mode, host }: { mode: "race" | "coop"; host: boolean }) {
+  const options = [
+    ["race", "CARRERA", "Puente y Tronco: cada uno contra todos"],
+    ["coop", "EN EQUIPO", "El Colchón: los 4 juntos"],
+  ] as const;
+  if (!host) {
+    const [, label, detail] = options.find(([value]) => value === mode)!;
+    return (
+      <p className="text-center text-foreground/80" data-testid="room-mode">
+        Van a jugar: <strong className="font-display text-sun">{label}</strong> · {detail}
+      </p>
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-1 rounded-2xl border-4 border-ink bg-ink/60 p-1" role="radiogroup" aria-label="Qué juegan" data-testid="room-mode">
+      {options.map(([value, label, detail]) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={mode === value}
+          data-testid={`room-mode-${value}`}
+          onClick={() => setRoomMode(value)}
+          className={`flex flex-col items-center rounded-xl px-2 py-1.5 transition ${mode === value ? "bg-sun text-ink" : "text-foreground/70 hover:bg-white/10"}`}
+        >
+          <span className="font-display text-lg">{label}</span>
+          <span className="text-center text-xs opacity-80">{detail}</span>
+        </button>
+      ))}
     </div>
   );
 }

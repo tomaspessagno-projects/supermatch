@@ -71,10 +71,13 @@ supermatch/
 │   │   │   ├── timefx.ts             # Congelado de impacto y cámara lenta
 │   │   │   ├── random.ts             # Aleatorio con semilla (bots)
 │   │   │   ├── rivals.ts             # Los 3 rivales de cualquier prueba: bots o remotos
+│   │   │   ├── rollback.ts           # Mundo compartido (pruebas en equipo): confirmado + predicción
+│   │   │   ├── interpolate.ts        # Dibuja al jugador entre dos pasos (pantallas de 90/144 Hz)
 │   │   │   ├── physics.ts            # Helpers puros: approach, spring, colisiones
 │   │   │   ├── contestant.ts         # Rig del concursante (títere de cartón)
 │   │   │   └── fx.ts                 # Partículas, carteles y destellos
 │   │   └── scenes/
+│   │       ├── mattress/             # El Colchón (en equipo): mundo compartido, bots en la sim
 │   │       ├── rolling-log/          # El Tronco Loco (mismos archivos que el Puente)
 │   │       └── slippery-bridge/      # El Puente Resbaladizo
 │   │           ├── tuning.ts         # Todas las perillas de feel
@@ -166,11 +169,13 @@ transacción y la portada, `/leaderboard` y `/results` la escuchan por Realtime.
 
 Tres modos, elegidos en la portada después del equipo:
 
-| Modo | Rivales | Ruta |
+Primero se elige **competir** (carrera) o **en equipo** (El Colchón); después:
+
+| Modo | Con quién | Ruta |
 |---|---|---|
-| Solo | 3 bots, uno de cada otro color | `/play` |
-| Carrera online | Hasta 3 personas al azar; los huecos, bots | `/online?modo=rapida` |
-| Con amigos | Sala con código de 5 letras / link | `/online` y `/online?sala=CÓDIGO` |
+| Solo | 3 bots (rivales o compañeros) | `/play` |
+| Online rápido | Hasta 3 personas al azar; los huecos, bots | `/online?modo=rapida` (`&tipo=equipo`) |
+| Con amigos | Sala con código de 5 letras / link; el anfitrión elige carrera o equipo | `/online` y `/online?sala=CÓDIGO` |
 
 **Cómo funciona (input streaming determinista).** Las simulaciones son puras y
 de paso fijo, así que no hace falta mandar posiciones: cada compu manda sus
@@ -231,6 +236,41 @@ Para más: plan Pro (500/s), bajar a 2 paquetes por segundo subiendo el atraso a
 en el último decimal entre navegadores distintos; en una carrera larga un remoto
 podría verse un poco distinto de lo que hizo. No importa para el puntaje, que
 llega aparte. Una pestaña en segundo plano no juega (el navegador la frena).
+
+## Pruebas en equipo (El Colchón)
+
+En carrera cada compu simula su propio mundo y a los demás como "fantasmas". En
+equipo eso no alcanza: los 4 están en **el mismo mundo** (dos colchones de dos
+portadores, saltadores, globos, rodillos). Se resuelve con **rollback**, sobre el
+mismo envío de teclas de las carreras:
+
+- Cada compu guarda el **mundo confirmado** (hasta el último tick del que tiene las
+  teclas de todos) y el **presente**, que sigue desde el confirmado suponiendo que
+  los demás siguen apretando lo último que apretaron. Se dibuja el presente: lo tuyo
+  responde al instante.
+- Cuando llegan teclas, el presente se rehace desde el confirmado (re-simular ~40
+  ticks por frame es barato). Los eventos (sonidos, efectos) solo salen de ticks
+  nuevos, así no se repiten.
+- Si alguien deja de mandar, pasados 2 s se confirma igual con su última tecla.
+- El puntaje final sale del mundo confirmado cuando están las teclas de todos hasta
+  el final de la ronda: da igual en todas las compus. Por las dudas, vale el del
+  árbitro (el primero de la lista).
+- En equipo, un cambio de tecla se manda enseguida (con 100 ms de mínimo entre
+  paquetes) en vez de esperar al lote de 250 ms: menos corrección del otro lado.
+
+Para que el mundo compartido dé exactamente igual en Chrome, Safari y Firefox, la
+simulación de El Colchón **no usa trigonometría** (solo sumas, productos y
+`Math.sqrt`, que el estándar fija bit a bit) y los bots viven dentro de la simulación,
+con su azar guardado en el mundo (se clonan con él).
+
+Lo que llega corregido de la red se dibuja **persiguiendo** su posición real (70 ms
+para los portadores remotos, 25 ms para los saltadores): una corrección se ve como un
+deslizamiento corto, no como un teletransporte. No hay cámara lenta ni congelado:
+todas las compus tienen que avanzar al mismo ritmo.
+
+Episodio en equipo = las 3 rondas de El Colchón (`PLAYLISTS.coop`), cada una con su
+vuelta de tuerca. El puntaje de la ronda es de los 4 y suma al equipo de cada uno en
+`finish_run` (minijuego `mattress`, tope 1000, mínimo 30 s).
 
 ## Infraestructura
 

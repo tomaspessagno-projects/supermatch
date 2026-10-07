@@ -6,26 +6,33 @@ import type {
   RivalResult,
   RunSlot,
 } from "@/bridge/events";
-import { type Participant, type Scores, soloParticipants } from "@/lib/participants";
+import { type EpisodeKind, type Participant, type Scores, soloParticipants } from "@/lib/participants";
 import * as api from "@/lib/supabase/api";
 import type { TeamId } from "@/lib/teams";
 import { slotSeed } from "@/online/protocol";
 
-/** Orden de los 3 minijuegos de un run. La tercera será Baldes al Tanque. */
-export const RUN_PLAYLIST: readonly MinigameId[] = [
-  "slippery_bridge",
-  "rolling_log",
-  "slippery_bridge",
-];
+/** Todo episodio tiene 3 pruebas (lo que valida finish_run). */
+export const EPISODE_LENGTH = 3;
+
+/** Las pruebas de cada tipo de episodio. En carrera, la tercera será Baldes al Tanque. */
+export const PLAYLISTS: Record<EpisodeKind, readonly MinigameId[]> = {
+  race: ["slippery_bridge", "rolling_log", "slippery_bridge"],
+  // En equipo: El Colchón en sus 3 rondas.
+  coop: ["mattress", "mattress", "mattress"],
+};
+
+export const RUN_PLAYLIST = PLAYLISTS.race;
 
 export function nextMinigame(
   results: readonly MinigameResult[],
   seed: number,
+  kind: EpisodeKind = "race",
 ): MinigameStart | null {
   const index = results.length;
-  if (index >= RUN_PLAYLIST.length) return null;
+  const playlist = PLAYLISTS[kind];
+  if (index >= playlist.length) return null;
   const slot = (index + 1) as RunSlot;
-  return { slot, minigameId: RUN_PLAYLIST[index], seed: slotSeed(seed, slot) };
+  return { slot, minigameId: playlist[index], seed: slotSeed(seed, slot) };
 }
 
 /** Envío del puntaje al ranking. */
@@ -52,6 +59,8 @@ type SessionState = {
   online: boolean;
   profileStatus: "unknown" | "loading" | "ready";
   mode: EpisodeMode;
+  /** Carrera o en equipo (se recuerda en este navegador). */
+  kind: EpisodeKind;
   /** Los 4 del episodio, en el mismo orden en todas las compus de la sala. */
   participants: Participant[];
   /** Semilla del episodio (los bots de cada prueba salen de acá). */
@@ -76,12 +85,15 @@ type SessionState = {
 
   loadProfile: () => Promise<void>;
   chooseTeam: (team: TeamId) => Promise<void>;
+  chooseKind: (kind: EpisodeKind) => void;
   playSolo: () => void;
   /** Lo llama la sala al arrancar: el próximo episodio es online con estos 4. */
-  prepareOnline: (episode: { seed: number; participants: Participant[]; schedule: Schedule }) => void;
+  prepareOnline: (episode: { seed: number; participants: Participant[]; schedule: Schedule; kind: EpisodeKind }) => void;
   scheduleSlot: (schedule: Schedule) => void;
   /** Puntos que llegan por la red (personas remotas, y los bots según el árbitro). */
   setScore: (id: string, slot: RunSlot, score: number) => void;
+  /** En equipo: el puntaje de la ronda es de los 4. */
+  setCrewScore: (slot: RunSlot, score: number) => void;
   /** Personas de la sala que se fueron (las demás quedan como están). */
   setLeft: (ids: readonly string[]) => void;
   startRun: () => void;
@@ -96,14 +108,25 @@ type SessionState = {
 };
 
 const MUTED_KEY = "supermatch:muted";
+const KIND_KEY = "supermatch:kind";
 
-function readMuted() {
+function readSetting(key: string): string | null {
   try {
-    return typeof window !== "undefined" && window.localStorage.getItem(MUTED_KEY) === "1";
+    return typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
   } catch {
-    return false; // modo privado o almacenamiento bloqueado
+    return null; // modo privado o almacenamiento bloqueado
   }
 }
+
+function saveSetting(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // sin almacenamiento: vale solo para esta visita
+  }
+}
+
+const readMuted = () => readSetting(MUTED_KEY) === "1";
 
 const messageOf = (error: unknown) =>
   (error as { message?: string } | null)?.message ?? String(error);
@@ -114,6 +137,7 @@ export const useSession = create<SessionState>()((set, get) => ({
   online: false,
   profileStatus: "unknown",
   mode: "solo",
+  kind: readSetting(KIND_KEY) === "coop" ? "coop" : "race",
   participants: [],
   seed: 0,
   schedule: null,
@@ -148,13 +172,23 @@ export const useSession = create<SessionState>()((set, get) => ({
     }
   },
 
+  chooseKind(kind) {
+    set({ kind });
+    saveSetting(KIND_KEY, kind);
+  },
+
   playSolo: () => set({ mode: "solo", schedule: null }),
 
-  prepareOnline: ({ seed, participants, schedule }) => set({ mode: "online", seed, participants, schedule }),
+  prepareOnline: ({ seed, participants, schedule, kind }) => set({ mode: "online", seed, participants, schedule, kind }),
 
   scheduleSlot: (schedule) => set({ schedule }),
 
   setScore: (id, slot, score) => set((s) => ({ scores: { ...s.scores, [id]: { ...s.scores[id], [slot]: score } } })),
+
+  setCrewScore: (slot, score) =>
+    set((s) => ({
+      scores: Object.fromEntries(s.participants.map((p) => [p.id, { ...s.scores[p.id], [slot]: score }])),
+    })),
 
   setLeft: (ids) =>
     set((s) => ({
@@ -182,6 +216,13 @@ export const useSession = create<SessionState>()((set, get) => ({
       const add = (id: string, score: number) => (scores[id] = { ...scores[id], [result.slot]: score });
       const me = s.participants.find((p) => p.kind === "me");
       if (me) add(me.id, result.score);
+      // En equipo, el puntaje es de los 4 (salvo que ya haya llegado el del árbitro).
+      if (s.kind === "coop") {
+        const referee = s.participants.find((p) => p.kind !== "bot");
+        const settled = referee && referee.kind !== "me" ? scores[referee.id]?.[result.slot] : undefined;
+        for (const p of s.participants) add(p.id, settled ?? result.score);
+        return { results: [...s.results, result], liveScore: 0, scores, phase: "between" };
+      }
       // Los bots, con lo que dio acá, salvo que ya haya llegado lo del árbitro.
       // Los remotos no: su puntaje real llega por la red.
       for (const r of rivals) {
@@ -191,12 +232,12 @@ export const useSession = create<SessionState>()((set, get) => ({
       return { results: [...s.results, result], liveScore: 0, scores, phase: "between" };
     }),
 
-  continueEpisode: () => set((s) => (s.phase === "between" && s.results.length < RUN_PLAYLIST.length ? { phase: "intro" } : s)),
+  continueEpisode: () => set((s) => (s.phase === "between" && s.results.length < EPISODE_LENGTH ? { phase: "intro" } : s)),
 
   async submitRun() {
     const { submission, run, results } = get();
     // Una sola vez por run, aunque la pantalla de resultados se vuelva a mostrar.
-    if (submission.status !== "idle" || results.length < RUN_PLAYLIST.length) return;
+    if (submission.status !== "idle" || results.length < EPISODE_LENGTH) return;
     set({ submission: { status: "sending" } });
     const runId = await run;
     if (!runId) {
@@ -220,11 +261,7 @@ export const useSession = create<SessionState>()((set, get) => ({
   toggleMuted() {
     const muted = !get().muted;
     set({ muted });
-    try {
-      window.localStorage.setItem(MUTED_KEY, muted ? "1" : "0");
-    } catch {
-      // sin almacenamiento: vale solo para esta visita
-    }
+    saveSetting(MUTED_KEY, muted ? "1" : "0");
   },
 }));
 

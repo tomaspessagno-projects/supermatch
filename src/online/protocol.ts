@@ -1,5 +1,5 @@
 import type { RunSlot } from "@/bridge/events";
-import type { Participant } from "@/lib/participants";
+import type { EpisodeKind, Participant } from "@/lib/participants";
 import { TEAMS } from "@/lib/teams";
 import type { Member } from "./channel";
 
@@ -9,7 +9,7 @@ import type { Member } from "./channel";
  */
 export type NetMessage =
   /** El anfitrión arranca el episodio: quiénes juegan, semilla y largada de la prueba 1. */
-  | { t: "start"; seed: number; players: Member[]; startIn: number }
+  | { t: "start"; seed: number; players: Member[]; startIn: number; kind: EpisodeKind }
   /** El anfitrión programa la prueba `slot` dentro de `startIn` ms. */
   | { t: "go"; slot: RunSlot; startIn: number }
   /** Teclas de los ticks [from, from + n) de la prueba `slot`. */

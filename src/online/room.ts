@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import type { MinigameResult, NetLink, RivalResult, RunSlot } from "@/bridge/events";
 import { randomNickname } from "@/lib/nicknames";
-import { RUN_PLAYLIST, useSession } from "@/store/session";
+import type { EpisodeKind } from "@/lib/participants";
+import { EPISODE_LENGTH, useSession } from "@/store/session";
 import { type Member, openChannel, type RoomChannel, type Transport } from "./channel";
 import { createInputRecorder, createRemoteInputs } from "./inputs";
 import {
@@ -41,6 +42,8 @@ type RoomState = {
   error: string | null;
   /** Sube con cada episodio que arranca: la UI va al juego cuando cambia. */
   episode: number;
+  /** Carrera o en equipo. En una sala de amigos lo elige el anfitrión. */
+  mode: EpisodeKind;
 };
 
 export const useRoom = create<RoomState>()(() => ({
@@ -52,6 +55,7 @@ export const useRoom = create<RoomState>()(() => ({
   searchingSince: null,
   error: null,
   episode: 0,
+  mode: "race",
 }));
 
 const LOCAL_KEY = "supermatch:red";
@@ -90,6 +94,7 @@ function identity(): Member | null {
     nickname: nickname ?? tabValue(NICK_KEY, randomNickname),
     team,
     joinedAt: Date.now(),
+    mode: useSession.getState().kind,
   };
 }
 
@@ -143,12 +148,13 @@ export async function leaveRoom() {
 
 // --- Buscar rivales --------------------------------------------------------
 
-export async function quickMatch() {
+export async function quickMatch(mode: EpisodeKind = "race") {
   await disconnect();
   const me = identity();
   if (!me) return;
-  set({ status: "matching", kind: "quick", code: null, me, members: [me], searchingSince: Date.now(), error: null });
-  const queue = openChannel("matchmaking", transport());
+  set({ status: "matching", kind: "quick", mode, code: null, me, members: [me], searchingSince: Date.now(), error: null });
+  // Una fila por tipo: los que buscan carrera no se cruzan con los que buscan equipo.
+  const queue = openChannel(mode === "coop" ? "matchmaking:coop" : "matchmaking", transport());
   matchChannel = queue;
   detach.push(
     queue.onMembers((members) => set({ members })),
@@ -225,6 +231,22 @@ export function isLobbyHost(members: readonly Member[], me: Member | null): bool
   return !!me && hostOf(members.filter((m) => !m.busy))?.id === me.id;
 }
 
+/** Lo que se va a jugar en la sala: carrera rápida según lo buscado; con amigos, lo que eligió el anfitrión. */
+export function roomMode(state: Pick<RoomState, "kind" | "mode" | "members">): EpisodeKind {
+  if (state.kind === "quick") return state.mode;
+  return hostOf(state.members.filter((m) => !m.busy))?.mode ?? "race";
+}
+
+/** El anfitrión elige carrera o en equipo (los demás lo ven en la sala). */
+export function setRoomMode(mode: EpisodeKind) {
+  const { me } = get();
+  session().chooseKind(mode);
+  if (!channel || !me) return;
+  const next = { ...me, mode };
+  channel.update(next);
+  set({ me: next });
+}
+
 /** El anfitrión arranca el episodio con los que están esperando. */
 export function startEpisode() {
   const { me, members } = get();
@@ -234,6 +256,7 @@ export function startEpisode() {
     seed: Math.floor(Math.random() * 2 ** 32) >>> 0,
     players: lobbyMembers(members),
     startIn: FIRST_START_IN_MS,
+    kind: roomMode(get()),
   };
   channel.send(message);
   receive(message, me.id);
@@ -265,7 +288,12 @@ function receive(message: NetMessage, from: string) {
       expected = null;
       const busy = { ...me, busy: true };
       channel?.update(busy);
-      session().prepareOnline({ seed: message.seed, participants: buildParticipants(players, me.id), schedule: { slot: 1, at } });
+      session().prepareOnline({
+        seed: message.seed,
+        participants: buildParticipants(players, me.id),
+        schedule: { slot: 1, at },
+        kind: message.kind,
+      });
       set((s) => ({ status: "playing", me: busy, episode: s.episode + 1 }));
       return;
     }
@@ -282,6 +310,12 @@ function receive(message: NetMessage, from: string) {
       return;
     case "res": {
       if (!players.some((p) => p.id === from)) return;
+      // En equipo, el puntaje del árbitro (el primero de la lista) vale para los 4.
+      if (session().kind === "coop") {
+        if (from === players[0]?.id) session().setCrewScore(message.slot, message.score);
+        else session().setScore(from, message.slot, message.score);
+        return;
+      }
       session().setScore(from, message.slot, message.score);
       // Los bots terminan distinto en cada compu (según cuándo terminaste vos):
       // vale lo que dice el árbitro, el primero de la lista.
@@ -346,7 +380,7 @@ function tick() {
   // El anfitrión del episodio (el más antiguo de los que siguen) programa la
   // siguiente cuando terminó él y llegaron los demás. Si su propia pestaña se
   // trabó (segundo plano), pasado el doble del plazo sigue igual.
-  if (slot >= RUN_PLAYLIST.length) return;
+  if (slot >= EPISODE_LENGTH) return;
   const present = members.filter((m) => players.some((p) => p.id === m.id));
   if (hostOf(present)?.id !== self.id) return;
   const stillHere = humans.filter((p) => !p.left).map((p) => p.id);
@@ -373,8 +407,14 @@ function remoteInputs(id: string, slot: RunSlot) {
   return r;
 }
 
+/** En equipo, un cambio de tecla sale enseguida (con este mínimo entre paquetes). */
+const COOP_FLUSH_GAP_MS = 100;
+let lastFlushAt = 0;
+let lastCode = -1;
+
 function flushInputs() {
   if (!channel || get().status !== "playing") return;
+  lastFlushAt = Date.now();
   for (const [slot, r] of recorders) {
     const batch = r.flush();
     if (batch) channel.send({ t: "in", slot, from: batch.from, data: batch.data });
@@ -383,7 +423,16 @@ function flushInputs() {
 
 /** Lo que el juego usa en una carrera online. */
 export const netLink: NetLink = {
-  sendInput: (slot, tick, input) => recorder(slot).record(tick, input),
+  sendInput(slot, tick, input) {
+    recorder(slot).record(tick, input);
+    // En una prueba compartida, cuanto antes lleguen los cambios, menos hay que
+    // corregir del otro lado. En carrera no hace falta (se ve con atraso igual).
+    const code = (Math.sign(input.move) + 1) * 2 + (input.jumpPressed ? 1 : 0);
+    if (code !== lastCode) {
+      lastCode = code;
+      if (session().kind === "coop" && Date.now() - lastFlushAt >= COOP_FLUSH_GAP_MS) flushInputs();
+    }
+  },
   remoteInput: (id, slot, tick) => remotes.get(`${id}:${slot}`)?.at(tick),
   remoteTicks: (id, slot) => remotes.get(`${id}:${slot}`)?.length ?? 0,
 };

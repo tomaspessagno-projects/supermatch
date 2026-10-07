@@ -1,5 +1,6 @@
 import type { KAPLAYCtx } from "kaplay";
 import type { MinigameStart } from "../../contract";
+import { createInterpolator } from "../../engine/interpolate";
 import { createRivals, rivalLooks } from "../../engine/rivals";
 import type { SceneContext } from "../../engine/scene";
 import { createTimeFx, type TimeFx } from "../../engine/timefx";
@@ -89,6 +90,7 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
     const rivalWorlds = rivals.runners.map((r) => r.world);
     const renderer = createRenderer(k, ctx.team.color, rivalLooks(ctx.rivals));
     const time = createTimeFx();
+    const smooth = createInterpolator();
     let started = false;
     let accumulator = 0;
     let tick = 0; // pasos de simulación del jugador en esta prueba
@@ -120,6 +122,7 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
           accumulator -= STEP;
           const input = { move, jumpPressed: jumpQueued };
           ctx.net?.sendInput(slot, tick, input);
+          smooth.before(world.player);
           const events = step(world, input, STEP);
           tick++;
           renderer.react(events, world);
@@ -150,6 +153,12 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
       }
     });
 
-    k.add([{ id: "rolling-log-view", draw: () => renderer.draw(world, rivalWorlds) }]);
+    k.add([
+      {
+        id: "rolling-log-view",
+        // El jugador se dibuja entre el último paso y el anterior (pantallas de 90/144 Hz).
+        draw: () => smooth.draw(world.player, accumulator / STEP, () => renderer.draw(world, rivalWorlds)),
+      },
+    ]);
   });
 }

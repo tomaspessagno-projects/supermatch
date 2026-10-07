@@ -1,6 +1,7 @@
 import kaplay from "kaplay";
 import { loadAssets } from "../assets";
 import type {
+  CrewMember,
   GameCommand,
   GameEvent,
   GameHandle,
@@ -9,6 +10,7 @@ import type {
   RivalSpec,
   TeamInfo,
 } from "../contract";
+import { MATTRESS_SCENE, registerMattress } from "../scenes/mattress";
 import { registerRollingLog, ROLLING_LOG_SCENE } from "../scenes/rolling-log";
 import {
   registerSlipperyBridge,
@@ -23,12 +25,15 @@ const GAME_HEIGHT = 720;
 const SCENE_BY_MINIGAME: Record<MinigameId, string> = {
   slippery_bridge: SLIPPERY_BRIDGE_SCENE,
   rolling_log: ROLLING_LOG_SCENE,
+  mattress: MATTRESS_SCENE,
 };
 
 export type CreateGameOptions = {
   root: HTMLElement;
   team: TeamInfo;
   rivals: readonly RivalSpec[];
+  /** Los 4 en orden, para las pruebas compartidas. */
+  crew: readonly CrewMember[];
   net?: NetLink;
   emit: (event: GameEvent) => void;
   muted: boolean;
@@ -38,6 +43,7 @@ export function createGame({
   root,
   team,
   rivals,
+  crew,
   net,
   emit,
   muted,
@@ -65,6 +71,7 @@ export function createGame({
   const ctx: SceneContext = {
     team,
     rivals,
+    crew,
     net,
     emit,
     audio,
@@ -81,6 +88,7 @@ export function createGame({
   loadSounds(k);
   registerSlipperyBridge(k, ctx);
   registerRollingLog(k, ctx);
+  registerMattress(k, ctx);
 
   return {
     send(command: GameCommand) {

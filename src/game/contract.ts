@@ -6,7 +6,7 @@
  */
 
 /** Debe coincidir con public.minigames.id */
-export type MinigameId = "slippery_bridge" | "rolling_log";
+export type MinigameId = "slippery_bridge" | "rolling_log" | "mattress";
 
 export type RunSlot = 1 | 2 | 3;
 
@@ -38,6 +38,17 @@ export type RivalSpec = {
   /** Para los avisos: el apodo si es una persona, el color si es un bot. */
   name: string;
   control: "bot" | "remote";
+};
+
+/**
+ * Los 4 de una prueba compartida (cooperativa), en el mismo orden en todas
+ * las compus: vos, personas remotas y bots.
+ */
+export type CrewMember = {
+  id: string;
+  team: TeamInfo;
+  name: string;
+  control: "me" | "bot" | "remote";
 };
 
 /** Puntaje de un rival al terminar la prueba (para los bots, cosmético). */

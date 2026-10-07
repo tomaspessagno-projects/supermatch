@@ -85,6 +85,7 @@ describe("episodio online", () => {
         { id: "cpu-1-green", name: "CPU Verde", team: "green", kind: "bot" },
       ],
       schedule: { slot: 1, at: 1000 },
+      kind: "race",
     });
     useSession.getState().startRun();
   });
@@ -121,5 +122,43 @@ describe("episodio online", () => {
     useSession.getState().startRun();
     expect(useSession.getState().participants.filter((p) => p.kind === "bot")).toHaveLength(3);
     expect(useSession.getState().schedule).toBeNull();
+  });
+});
+
+describe("episodio en equipo", () => {
+  beforeEach(() => {
+    useSession.setState({ team: "green", online: false, mode: "solo", kind: "coop" });
+    useSession.getState().startRun();
+  });
+
+  it("son las 3 rondas de El Colchón", () => {
+    const s = useSession.getState();
+    expect(nextMinigame([], s.seed, "coop")).toMatchObject({ slot: 1, minigameId: "mattress" });
+    expect(nextMinigame([result(1, 0), result(2, 0)], s.seed, "coop")).toMatchObject({ slot: 3, minigameId: "mattress" });
+  });
+
+  it("el puntaje de la ronda es de los 4", () => {
+    const s = useSession.getState;
+    s().recordResult({ slot: 1, minigameId: "mattress", score: 640, durationMs: 40_000 }, []);
+    for (const p of s().participants) expect(s().scores[p.id]).toEqual({ 1: 640 });
+  });
+
+  it("online vale el del árbitro, aunque llegue antes", () => {
+    useSession.getState().prepareOnline({
+      seed: 1,
+      participants: [
+        { id: "a", name: "Pato", team: "red", kind: "remote" },
+        { id: "b", name: "Sapo", team: "green", kind: "me" },
+        { id: "cpu-0-blue", name: "CPU Azul", team: "blue", kind: "bot" },
+        { id: "cpu-1-yellow", name: "CPU Amarillo", team: "yellow", kind: "bot" },
+      ],
+      schedule: { slot: 1, at: 0 },
+      kind: "coop",
+    });
+    const s = useSession.getState;
+    s().startRun();
+    s().setCrewScore(1, 700);
+    s().recordResult({ slot: 1, minigameId: "mattress", score: 690, durationMs: 40_000 }, []);
+    expect(Object.values(s().scores).map((x) => x[1])).toEqual([700, 700, 700, 700]);
   });
 });

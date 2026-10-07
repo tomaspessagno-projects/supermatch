@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { RUN_PLAYLIST, useSession } from "@/store/session";
+import { EPISODE_LENGTH, useSession } from "@/store/session";
 
 export function Hud() {
   const team = useSession((s) => s.team);
@@ -19,7 +19,7 @@ export function Hud() {
       <p className="text-cartoon text-2xl text-white @max-3xl:text-xs">
         PRUEBA{" "}
         <span data-testid="hud-slot" className="text-sun">
-          {Math.min(slot, RUN_PLAYLIST.length)}/{RUN_PLAYLIST.length}
+          {Math.min(slot, EPISODE_LENGTH)}/{EPISODE_LENGTH}
         </span>
       </p>
       <div className="flex items-center gap-2">

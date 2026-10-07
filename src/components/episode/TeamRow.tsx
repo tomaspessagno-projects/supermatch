@@ -22,7 +22,8 @@ export function TeamRow({
   return (
     <li
       data-testid={`row-${participant.id}`}
-      className={`flex items-center gap-3 rounded-2xl bg-white/5 px-3 py-2 @max-3xl:gap-1.5 @max-3xl:rounded-xl @max-3xl:px-2 @max-3xl:py-1 ${mine ? "ring-4 ring-sun @max-3xl:ring-2" : ""} ${participant.left ? "opacity-50" : ""}`}
+      style={{ animationDelay: `${120 + rank * 80}ms` }}
+      className={`flex animate-[row-in_0.35s_ease-out_both] items-center motion-reduce:animate-none gap-3 rounded-2xl bg-white/5 px-3 py-2 @max-3xl:gap-1.5 @max-3xl:rounded-xl @max-3xl:px-2 @max-3xl:py-1 ${mine ? "ring-4 ring-sun @max-3xl:ring-2" : ""} ${participant.left ? "opacity-50" : ""}`}
     >
       <span className="text-cartoon w-6 text-center text-2xl text-white @max-3xl:w-4 @max-3xl:text-base">{rank}</span>
       <Image src={`/ui/badge-${participant.team}.png`} alt="" width={186} height={186} className="size-9 @max-3xl:size-6" />

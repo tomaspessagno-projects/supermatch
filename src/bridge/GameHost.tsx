@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { GameEvent, GameHandle, RivalSpec } from "@/game/contract";
+import type { CrewMember, GameEvent, GameHandle, RivalSpec } from "@/game/contract";
 import { shortTeamName } from "@/lib/participants";
 import { getTeam, type TeamId } from "@/lib/teams";
 import { netLink, reportResult } from "@/online/room";
@@ -59,7 +59,7 @@ export function GameHost({ team }: GameHostProps) {
     ]).then(([{ createGame }]) => {
       if (disposed) return;
       session().startRun();
-      const { mode, participants, seed } = session();
+      const { mode, participants, seed, kind } = session();
       const info = (id: TeamId) => ({ id, color: getTeam(id).color, name: shortTeamName(id) });
       // Los bots se nombran por su color; las personas, por su apodo.
       const rivals: RivalSpec[] = participants
@@ -70,10 +70,18 @@ export function GameHost({ team }: GameHostProps) {
           name: p.kind === "bot" ? shortTeamName(p.team) : p.name,
           control: p.kind === "bot" ? "bot" : "remote",
         }));
+      // En equipo, los 4 en el orden de la sala (igual en todas las compus).
+      const crew: CrewMember[] = participants.map((p) => ({
+        id: p.id,
+        team: info(p.team),
+        name: p.kind === "bot" ? shortTeamName(p.team) : p.name,
+        control: p.kind === "me" ? "me" : p.kind,
+      }));
       const current = createGame({
         root,
         team: info(team),
         rivals,
+        crew,
         net: mode === "online" ? netLink : undefined,
         emit: onGameEvent,
         muted: session().muted,
@@ -81,7 +89,7 @@ export function GameHost({ team }: GameHostProps) {
       game = current;
       setActiveGame(current);
 
-      const first = nextMinigame([], seed);
+      const first = nextMinigame([], seed, kind);
       if (first) current.send({ type: "minigame:start", ...first });
       // Online la cuenta corre con el reloj de la sala: si el juego tardó en
       // cargar, puede que el silbato ya haya sonado.
@@ -93,7 +101,7 @@ export function GameHost({ team }: GameHostProps) {
           current.focus();
         }
         if (state.phase === "intro" && prev.phase === "between") {
-          const next = nextMinigame(state.results, state.seed);
+          const next = nextMinigame(state.results, state.seed, state.kind);
           if (next) current.send({ type: "minigame:start", ...next });
         }
         if (state.muted !== prev.muted) current.send({ type: "mute", muted: state.muted });

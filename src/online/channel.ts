@@ -1,10 +1,14 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
+import type { EpisodeKind } from "@/lib/participants";
 import type { TeamId } from "@/lib/teams";
 import type { NetMessage } from "./protocol";
 
-/** Quién está en un canal (presencia). `busy`: está en plena carrera o viendo los resultados. */
-export type Member = { id: string; nickname: string; team: TeamId; joinedAt: number; busy?: boolean };
+/**
+ * Quién está en un canal (presencia). `busy`: está en plena carrera o viendo
+ * los resultados. `mode`: lo que quiere jugar (en la sala vale el del anfitrión).
+ */
+export type Member = { id: string; nickname: string; team: TeamId; joinedAt: number; busy?: boolean; mode?: EpisodeKind };
 
 /**
  * Un canal de la sala: quién está (presencia) y mensajes a todos los demás.
@@ -65,7 +69,7 @@ function supabaseChannel(name: string): RoomChannel {
           members = Object.values(state)
             .map((metas) => metas[0])
             .filter(Boolean)
-            .map(({ id, nickname, team, joinedAt, busy }) => ({ id, nickname, team, joinedAt, busy }))
+            .map(({ id, nickname, team, joinedAt, busy, mode }) => ({ id, nickname, team, joinedAt, busy, mode }))
             .sort(byJoin);
           memberEvents.emit(members);
         })
@@ -136,7 +140,7 @@ function localChannel(name: string): RoomChannel {
         const before = seen.get(data.member.id)?.member;
         seen.set(data.member.id, { member: data.member, at: Date.now() });
         if (data.k === "hi") post({ k: "here", member: me! });
-        if (!before || before.busy !== data.member.busy) changed();
+        if (!before || before.busy !== data.member.busy || before.mode !== data.member.mode) changed();
       };
       post({ k: "hi", member: self });
       timer = setInterval(() => {

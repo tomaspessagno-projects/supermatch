@@ -25,8 +25,41 @@ export const MINIGAMES: Record<MinigameId, MinigameInfo> = {
       { keys: "ESPACIO", touch: "⤒", action: "saltar" },
     ],
   },
+  mattress: {
+    name: "El Colchón",
+    rule: "Llevá el colchón con tu compañero y atajá a los que se tiran de la torre: que reboten de colchón en colchón hasta el pelotero.",
+    controls: [
+      { keys: "← →", touch: "◀ ▶", action: "mover el colchón" },
+      { keys: "ESPACIO", touch: "⤒", action: "saltar (¡juntos!)" },
+    ],
+  },
 };
 
-export const MINIGAME_NAMES: Record<MinigameId, string> = Object.fromEntries(
-  Object.entries(MINIGAMES).map(([id, info]) => [id, info.name]),
-) as Record<MinigameId, string>;
+/** El Colchón se juega en 3 rondas, una por prueba, cada una con su vuelta de tuerca. */
+const MATTRESS_ROUNDS: Record<number, { title: string; rule: string }> = {
+  1: {
+    title: "¡Atajalos!",
+    rule: "Atajá a los que se tiran de la torre y hacelos rebotar hasta el pelotero. Si saltan juntos justo cuando cae (el anillo se pone verde), sale con súper rebote.",
+  },
+  2: {
+    title: "Lluvia de globos",
+    rule: "Caen globos de agua: si pegan en el colchón se empapan y van más lento; en la cabeza, te tiran. Los dorados valen el doble.",
+  },
+  3: {
+    title: "La barrera",
+    rule: "Por la pasarela vienen rodillos: ¡salten sin soltar el colchón! Y ojo con los charcos de jabón: cuesta frenar.",
+  },
+};
+
+/** Nombre, regla y controles de una prueba del episodio (El Colchón cambia por ronda). */
+export function minigameInfo(id: MinigameId, slot: number): MinigameInfo & { round?: string } {
+  const info = MINIGAMES[id];
+  if (id !== "mattress") return info;
+  const round = MATTRESS_ROUNDS[slot] ?? MATTRESS_ROUNDS[1];
+  return { ...info, rule: round.rule, round: `Ronda ${slot}: ${round.title}` };
+}
+
+/** Para listas cortas ("El Colchón · Ronda 2"). */
+export function minigameTitle(id: MinigameId, slot: number): string {
+  return id === "mattress" ? `${MINIGAMES[id].name} · Ronda ${slot}` : MINIGAMES[id].name;
+}

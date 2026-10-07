@@ -190,6 +190,20 @@ Action: The floor vanishes: the character hangs in the air for a moment like in 
 Action: The character celebrates winning: hops with joy, pumps its fists, big open-mouth smile, a silly happy dance. Loops seamlessly.
 ```
 
+#### llevar.mp4 (loop) — El Colchón
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D, not realistic). Keep the exact same character, proportions and plain white clothes. Side view, the character faces RIGHT the whole time. Static locked-off camera: no zoom, no pan, no camera movement. The character stays in the same spot, full body always inside the frame with margin. The background stays flat pure green (#00FF00) for the whole video: no floor, no shadows, no props, no text. Cartoon sound effects only, no music, no dialogue.
+Action: The character walks IN PLACE holding the end of an invisible heavy stretcher at waist height with both hands in front: short shuffling steps, knees bent, body leaning back a little from the weight, focused face. Loops seamlessly.
+```
+
+#### tirarse.mp4 (una vez) — El Colchón
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D, not realistic). Keep the exact same character, proportions and plain white clothes. Side view, the character faces RIGHT the whole time. Static locked-off camera: no zoom, no pan, no camera movement. The character stays in the same spot, full body always inside the frame with margin. The background stays flat pure green (#00FF00) for the whole video: no floor, no shadows, no props, no text. Cartoon sound effects only, no music, no dialogue.
+Action: The character stands at the edge of a high diving board looking down, knees shaking with fear, then pinches its nose, screams and jumps forward, tumbling in the air with arms and legs flailing.
+```
+
 ### Portada (cuadro de inicio: `inicio-frente.png`)
 
 #### saludo.mp4 (loop)
@@ -276,6 +290,24 @@ Props sheet for a 2D side-scrolling TV game-show obstacle course. Each object is
 4. a golden soap bubble pickup with a sparkle
 5. a big swinging foam pendulum hammer on a long rope, pink and yellow
 6. a giant inflatable shark, decoration
+Style: 2D cartoon game art for a goofy TV game-show party game. Thick dark-purple outlines (#1F1147), flat saturated colors with a single soft cel-shading tone, chunky rounded shapes, clean vector look. No text, no watermark.
+Isolated on a perfectly flat pure green (#00FF00) background with no shadows and no gradient; nothing touching the image edges; do not use green anywhere on the objects.
+```
+
+### El Colchón (16:9) — **props-colchon.png**
+
+Hoy El Colchón se arma con piezas de otras pruebas (andamio, pileta inflable, arco,
+rodillo) y el colchón se dibuja por código. Con esta hoja queda con identidad propia.
+
+```
+Props sheet for a 2D side-view TV game-show stage. Each object isolated with generous empty space between them, nothing overlapping:
+1. a long inflatable rescue mattress seen exactly from the side, as if held by its two ends: puffy pink (#F472B6) tubes with yellow (#FACC15) stripes, rounded ends, a little sag in the middle
+2. a tall diving tower made of scaffolding, side view, with a ladder and a short yellow springboard at the top pointing RIGHT
+3. a floating walkway segment seen from the side: white planks on pink buoys; it must tile seamlessly left to right
+4. a round inflatable ball pit (pelotero) seen from the side, pink and yellow ring, full of colorful plastic balls (red, blue, yellow, white; no green)
+5. three water balloons: blue, pink and lime-yellow, each with a knot
+6. a cartoon water balloon bursting: splash of cyan water drops with white foam
+7. a short soapy puddle seen from the side, white foam with bubbles
 Style: 2D cartoon game art for a goofy TV game-show party game. Thick dark-purple outlines (#1F1147), flat saturated colors with a single soft cel-shading tone, chunky rounded shapes, clean vector look. No text, no watermark.
 Isolated on a perfectly flat pure green (#00FF00) background with no shadows and no gradient; nothing touching the image edges; do not use green anywhere on the objects.
 ```
@@ -478,4 +510,6 @@ articulaciones del rig (cuello, hombro, cadera) están en `src/game/engine/conte
 | Presentador/a | Integrado: cabeza que habla en presentación, tabla y resultados |
 | Árbitro | Integrado: silbato en la largada y la cuenta, tarjeta roja, bandera al final |
 | Baldes al Tanque (`props-baldes`) | Generada; falta subirla a `art/source/` |
+| El Colchón (`props-colchon`) | Pedida; mientras, se usan piezas de otras pruebas y el colchón por código |
+| Clips del personaje (`correr`, `llevar`, `tirarse`…) | Pedidos. Mientras tanto el títere tiene rodillas y codos |
 | Voces del presentador | Pedidas (prompts de arriba) |

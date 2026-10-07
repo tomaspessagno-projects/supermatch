@@ -31,6 +31,36 @@
     }
   }
 
+  /* Carteles del programa: entran desde abajo con un rebotito. */
+  @keyframes card-in {
+    0% {
+      translate: 0 28px;
+      scale: 0.9;
+      opacity: 0;
+    }
+    60% {
+      translate: 0 -4px;
+      scale: 1.02;
+      opacity: 1;
+    }
+    100% {
+      translate: 0 0;
+      scale: 1;
+    }
+  }
+
+  /* Filas de tabla: entran de a una desde el costado. */
+  @keyframes row-in {
+    0% {
+      translate: -24px 0;
+      opacity: 0;
+    }
+    100% {
+      translate: 0 0;
+      opacity: 1;
+    }
+  }
+
   @keyframes wobble {
     0%,
     100% {

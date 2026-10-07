@@ -6,9 +6,9 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Host } from "@/components/episode/Host";
 import { TeamRow } from "@/components/episode/TeamRow";
-import { tableLine } from "@/lib/host";
-import { MINIGAME_NAMES } from "@/lib/minigames";
-import { standings } from "@/lib/participants";
+import { tableLine, teamLine } from "@/lib/host";
+import { minigameTitle } from "@/lib/minigames";
+import { MEDAL_ICON, MEDAL_LABEL, medalFor, standings } from "@/lib/participants";
 import { getTeam } from "@/lib/teams";
 import { leaveRoom, useRoom } from "@/online/room";
 import { type Submission, useSession } from "@/store/session";
@@ -22,6 +22,7 @@ export function ResultsSummary() {
   const participants = useSession((s) => s.participants);
   const scores = useSession((s) => s.scores);
   const online = useSession((s) => s.mode === "online");
+  const coop = useSession((s) => s.kind === "coop");
   const total = results.reduce((sum, r) => sum + r.score, 0);
 
   useEffect(() => {
@@ -40,7 +41,9 @@ export function ResultsSummary() {
   const table = standings(participants, scores);
   const winner = table[0].participant;
   const won = winner.kind === "me";
-  const line = tableLine(table, true);
+  // En equipo: la medalla del episodio es la del promedio de las rondas.
+  const teamMedal = medalFor(total / Math.max(1, results.length));
+  const line = coop ? teamLine(results[results.length - 1]?.score ?? 0, total, true) : tableLine(table, true);
 
   return (
     <div className="flex w-full items-end justify-center gap-8">
@@ -48,15 +51,32 @@ export function ResultsSummary() {
       <Image src="/ui/host.png" alt="" width={250} height={401} className="mb-6 hidden h-96 w-auto lg:block" />
       <div className="flex w-full max-w-md flex-col gap-5 rounded-3xl border-4 border-ink bg-ink/60 p-6">
         <Host key={line} line={line} />
-        <div className="flex flex-col items-center gap-1 text-center" data-testid="episode-winner">
-          <Image src={`/ui/badge-${winner.team}.png`} alt="" width={186} height={186} className="size-20 animate-wobble" />
-          <p className="text-cartoon text-3xl text-sun">{won ? "¡GANASTE EL EPISODIO!" : `GANÓ ${winner.name.toUpperCase()}`}</p>
-        </div>
-        <ol className="flex flex-col gap-2" data-testid="standings">
-          {table.map((row, i) => (
-            <TeamRow key={row.participant.id} rank={i + 1} row={row} online={online} />
-          ))}
-        </ol>
+        {coop ? (
+          <div className="flex flex-col items-center gap-2 text-center" data-testid="episode-winner">
+            <span className="animate-wobble text-7xl" aria-hidden>{teamMedal ? MEDAL_ICON[teamMedal] : "💦"}</span>
+            <p className="text-cartoon text-3xl text-sun">{teamMedal ? `¡EQUIPO DE ${MEDAL_LABEL[teamMedal]}!` : "¡TERMINARON!"}</p>
+            <ul className="flex flex-wrap justify-center gap-2" data-testid="standings">
+              {participants.map((p) => (
+                <li key={p.id} className={`flex items-center gap-1.5 rounded-full bg-white/10 py-0.5 pl-0.5 pr-3 text-sm ${p.kind === "me" ? "ring-2 ring-sun" : ""}`}>
+                  <Image src={`/ui/badge-${p.team}.png`} alt="" width={186} height={186} className="size-6" />
+                  <span className="font-display text-white">{p.kind === "me" ? "VOS" : p.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col items-center gap-1 text-center" data-testid="episode-winner">
+              <Image src={`/ui/badge-${winner.team}.png`} alt="" width={186} height={186} className="size-20 animate-wobble" />
+              <p className="text-cartoon text-3xl text-sun">{won ? "¡GANASTE EL EPISODIO!" : `GANÓ ${winner.name.toUpperCase()}`}</p>
+            </div>
+            <ol className="flex flex-col gap-2" data-testid="standings">
+              {table.map((row, i) => (
+                <TeamRow key={row.participant.id} rank={i + 1} row={row} online={online} />
+              ))}
+            </ol>
+          </>
+        )}
         <div className="flex items-center gap-3 border-t-4 border-dashed border-white/15 pt-4">
           <Image src={`/ui/badge-${team}.png`} alt="" width={186} height={186} className="size-10" />
           <p className="text-cartoon text-xl text-white">Tus puntos para {getTeam(team).name}</p>
@@ -65,9 +85,12 @@ export function ResultsSummary() {
           {results.map((r) => (
             <li key={r.slot} className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-2">
               <span className="text-foreground/80">
-                {r.slot}. {MINIGAME_NAMES[r.minigameId]}
+                {r.slot}. {minigameTitle(r.minigameId, r.slot)}
               </span>
-              <span className="font-display text-xl tabular-nums">{r.score}</span>
+              <span className="font-display text-xl tabular-nums">
+                {coop && medalFor(r.score) ? `${MEDAL_ICON[medalFor(r.score)!]} ` : ""}
+                {r.score}
+              </span>
             </li>
           ))}
         </ol>

@@ -4,11 +4,11 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { sendToGame } from "@/bridge/input";
 import type { RunSlot } from "@/bridge/events";
-import { introLine, tableLine } from "@/lib/host";
-import { MINIGAMES } from "@/lib/minigames";
-import { standings } from "@/lib/participants";
+import { introLine, tableLine, teamLine } from "@/lib/host";
+import { minigameInfo } from "@/lib/minigames";
+import { MEDAL_ICON, MEDAL_LABEL, medalFor, type Participant, standings } from "@/lib/participants";
 import { COUNTDOWN_MS, INTRO_LEAD_MS } from "@/online/protocol";
-import { RUN_PLAYLIST, useSession } from "@/store/session";
+import { EPISODE_LENGTH, PLAYLISTS, useSession } from "@/store/session";
 import { Host } from "./Host";
 import { TeamRow } from "./TeamRow";
 
@@ -69,7 +69,9 @@ export function EpisodeOverlay({ onFinished }: { onFinished: () => void }) {
 function Panel({ children }: { children: React.ReactNode }) {
   return (
     <div className="absolute inset-0 z-10 flex overflow-y-auto bg-ink/55 p-4 backdrop-blur-[2px] @max-3xl:p-2">
-      <div className="m-auto flex w-full justify-center">{children}</div>
+      <div className="m-auto flex w-full animate-[card-in_0.45s_cubic-bezier(0.2,1.2,0.4,1)_both] justify-center motion-reduce:animate-none">
+        {children}
+      </div>
     </div>
   );
 }
@@ -81,12 +83,14 @@ function IntroCard() {
   const results = useSession((s) => s.results);
   const online = useSession((s) => s.mode === "online");
   const participants = useSession((s) => s.participants);
+  const kind = useSession((s) => s.kind);
   const startCountdown = useSession((s) => s.startCountdown);
   const ready = useReady();
   const slot = results.length + 1;
-  const minigame = RUN_PLAYLIST[results.length] ?? RUN_PLAYLIST[0];
-  const info = MINIGAMES[minigame];
-  const line = introLine(minigame, slot, RUN_PLAYLIST.length);
+  const playlist = PLAYLISTS[kind];
+  const minigame = playlist[results.length] ?? playlist[0];
+  const info = minigameInfo(minigame, slot);
+  const line = introLine(minigame, slot, EPISODE_LENGTH);
   // Online la cuenta arranca sola, a la misma hora en todas las compus.
   const startsAt = useStartsAt(slot);
   useAt(online && startsAt !== null ? startsAt - COUNTDOWN_MS : null, startCountdown);
@@ -96,9 +100,10 @@ function IntroCard() {
       <div className={`${CARD} items-center text-center`} data-testid="intro-card">
         <Host key={line} line={line} />
         <p className="font-display text-lg text-water @max-3xl:text-sm">
-          PRUEBA {slot} DE {RUN_PLAYLIST.length}
+          {kind === "coop" ? "EN EQUIPO · " : ""}PRUEBA {slot} DE {EPISODE_LENGTH}
         </p>
         <h2 className="text-cartoon -rotate-2 text-5xl text-sun @max-3xl:text-2xl">{info.name}</h2>
+        {info.round && <p className="font-display text-xl text-rubber @max-3xl:text-sm" data-testid="round-title">{info.round}</p>}
         <p className="text-foreground/85 @max-3xl:text-xs">{info.rule}</p>
         <ul className="flex flex-wrap justify-center gap-3 @max-3xl:gap-2 @max-3xl:text-xs">
           {info.controls.map((c) => (
@@ -225,13 +230,14 @@ function GoBanner() {
 
 function BetweenTable({ onFinished }: { onFinished: () => void }) {
   const online = useSession((s) => s.mode === "online");
+  const kind = useSession((s) => s.kind);
   const participants = useSession((s) => s.participants);
   const scores = useSession((s) => s.scores);
   const results = useSession((s) => s.results);
   const continueEpisode = useSession((s) => s.continueEpisode);
   const ready = useReady();
   const slot = results.length as RunSlot;
-  const isLast = slot >= RUN_PLAYLIST.length;
+  const isLast = slot >= EPISODE_LENGTH;
   const next = isLast ? onFinished : continueEpisode;
 
   // Online: las personas que todavía están corriendo esta prueba.
@@ -252,27 +258,40 @@ function BetweenTable({ onFinished }: { onFinished: () => void }) {
   useAt(online && !isLast && nextStartsAt !== null ? nextStartsAt - INTRO_LEAD_MS : null, continueEpisode);
 
   const table = standings(participants, scores, slot);
-  const line = done ? tableLine(table, isLast) : "¡Todavía hay gente en carrera! Esperamos a que lleguen...";
+  // En equipo, todos tienen el mismo puntaje: el del equipo.
+  const me = participants.find((p) => p.kind === "me");
+  const rounds = Array.from({ length: slot }, (_, i) => scores[me?.id ?? ""]?.[(i + 1) as RunSlot] ?? 0);
+  const total = rounds.reduce((a, b) => a + b, 0);
+  const line = !done
+    ? "¡Todavía hay gente en carrera! Esperamos a que lleguen..."
+    : kind === "coop"
+      ? teamLine(rounds[slot - 1] ?? 0, total, isLast)
+      : tableLine(table, isLast);
   const showButton = !online || (isLast && done);
+  const title = kind === "coop" ? (isLast ? "RESULTADO DEL EQUIPO" : `RONDA ${slot}`) : isLast ? "TABLA FINAL" : `TABLA · PRUEBA ${slot}`;
 
   return (
     <Panel>
       <div className={CARD} data-testid="between-table">
         <Host key={line} line={line} />
-        <h2 className="text-cartoon text-center text-3xl text-sun @max-3xl:text-xl">{isLast ? "TABLA FINAL" : `TABLA · PRUEBA ${slot}`}</h2>
-        {/* En el cuadro chico, la tabla va en dos columnas para que entre. */}
-        <ol className="flex flex-col gap-2 @max-3xl:grid @max-3xl:grid-cols-2 @max-3xl:gap-1.5">
-          {table.map((row, i) => (
-            <TeamRow
-              key={row.participant.id}
-              rank={i + 1}
-              row={row}
-              showGained
-              online={online}
-              waiting={waiting.includes(row.participant.id)}
-            />
-          ))}
-        </ol>
+        <h2 className="text-cartoon text-center text-3xl text-sun @max-3xl:text-xl">{title}</h2>
+        {kind === "coop" ? (
+          <TeamCard participants={participants} rounds={rounds} total={total} />
+        ) : (
+          // En el cuadro chico, la tabla va en dos columnas para que entre.
+          <ol className="flex flex-col gap-2 @max-3xl:grid @max-3xl:grid-cols-2 @max-3xl:gap-1.5">
+            {table.map((row, i) => (
+              <TeamRow
+                key={row.participant.id}
+                rank={i + 1}
+                row={row}
+                showGained
+                online={online}
+                waiting={waiting.includes(row.participant.id)}
+              />
+            ))}
+          </ol>
+        )}
         {showButton ? (
           <button
             type="button"
@@ -281,7 +300,7 @@ function BetweenTable({ onFinished }: { onFinished: () => void }) {
             aria-disabled={!ready}
             className={`${BUTTON} self-center px-6 py-2 text-xl @max-3xl:py-1 @max-3xl:text-base ${ready ? "" : "opacity-60"}`}
           >
-            {isLast ? "VER RESULTADOS" : "SIGUIENTE PRUEBA"}
+            {isLast ? "VER RESULTADOS" : kind === "coop" ? "SIGUIENTE RONDA" : "SIGUIENTE PRUEBA"}
           </button>
         ) : (
           <div className="self-center">
@@ -291,4 +310,67 @@ function BetweenTable({ onFinished }: { onFinished: () => void }) {
       </div>
     </Panel>
   );
+}
+
+/** En equipo: los 4, la medalla de la ronda y cómo vienen las tres. */
+function TeamCard({ participants, rounds, total }: { participants: readonly Participant[]; rounds: readonly number[]; total: number }) {
+  const last = rounds[rounds.length - 1] ?? 0;
+  const medal = medalFor(last);
+  return (
+    <div className="flex flex-col items-center gap-3 @max-3xl:gap-1.5" data-testid="team-card">
+      <ul className="flex flex-wrap justify-center gap-2 @max-3xl:gap-1">
+        {participants.map((p) => (
+          <li key={p.id} className={`flex items-center gap-1.5 rounded-full bg-white/10 py-0.5 pl-0.5 pr-3 text-sm @max-3xl:text-xs ${p.kind === "me" ? "ring-2 ring-sun" : ""} ${p.left ? "opacity-50" : ""}`}>
+            <Image src={`/ui/badge-${p.team}.png`} alt="" width={186} height={186} className="size-6 @max-3xl:size-5" />
+            <span className="font-display text-white">{p.kind === "me" ? "VOS" : p.name}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center gap-4 @max-3xl:gap-2">
+        <span className="animate-[pop_0.6s_ease-out] text-6xl @max-3xl:text-3xl" aria-hidden>
+          {medal ? MEDAL_ICON[medal] : "💦"}
+        </span>
+        <div className="text-left">
+          <p className="font-display text-water @max-3xl:text-xs">{medal ? `MEDALLA DE ${MEDAL_LABEL[medal]}` : "SIN MEDALLA"}</p>
+          <p className="text-cartoon text-5xl text-sun tabular-nums @max-3xl:text-2xl" data-testid="round-score">
+            <CountUp to={last} />
+          </p>
+        </div>
+      </div>
+      <ol className="flex gap-2 @max-3xl:gap-1">
+        {Array.from({ length: EPISODE_LENGTH }, (_, i) => {
+          const score = rounds[i];
+          const m = score === undefined ? null : medalFor(score);
+          return (
+            <li key={i} className={`flex min-w-20 flex-col items-center rounded-2xl px-3 py-1 @max-3xl:min-w-14 @max-3xl:px-1.5 @max-3xl:py-0.5 ${score === undefined ? "bg-white/5 text-foreground/50" : "bg-white/10"}`}>
+              <span className="font-display text-xs">RONDA {i + 1}</span>
+              <span className="font-display text-lg tabular-nums text-white @max-3xl:text-sm">
+                {score === undefined ? "—" : `${m ? MEDAL_ICON[m] : ""} ${score}`}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="font-display text-lg text-foreground/80 @max-3xl:text-sm">
+        TOTAL DEL EQUIPO <span className="text-sun tabular-nums">{total}</span>
+      </p>
+    </div>
+  );
+}
+
+/** Un número que sube de 0 hasta `to` (la tabla se siente viva). */
+function CountUp({ to, ms = 900 }: { to: number; ms?: number }) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / ms);
+      setValue(Math.round(to * (1 - (1 - t) ** 3)));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [to, ms]);
+  return <>{value}</>;
 }
