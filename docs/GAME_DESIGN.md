@@ -193,7 +193,11 @@ y **disfraces** cosméticos que se desbloquean jugando.
 
 Tamaños: **S** = 1 iteración, **M** = 1–2, **L** = 2–4.
 
-### Fase 1 — "Esto es un show" (sin arte nuevo)
+### Fase 1 — "Esto es un show" (sin arte nuevo) ✅
+
+Hecha. Los bots quedaron calibrados (puntaje medio en 12 carreras): as ≈ 900,
+promedio ≈ 710, torpe ≈ 500; quien cruza en 30 s con una caída saca ≈ 830. El
+sonido usa placeholders sintetizados hasta que lleguen los audios de Flow.
 
 | # | Entregable | Tamaño | Terminado cuando |
 |---|---|---|---|

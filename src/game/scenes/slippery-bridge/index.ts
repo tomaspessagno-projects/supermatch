@@ -40,7 +40,7 @@ export function registerSlipperyBridge(k: KAPLAYCtx, ctx: SceneContext) {
           break;
         case "splash":
           audio.play("splash", { vary: 1 });
-          audio.play("cheer", { volume: 0.6 }); // la tribuna se ríe
+          audio.play("laugh", { vary: 1 }); // la tribuna se ríe
           break;
         case "checkpoint":
           audio.play("checkpoint");

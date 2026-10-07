@@ -15,6 +15,8 @@ npm run lint     # incluye las fronteras React ⇄ KAPLAY
 npm test         # física y reglas de los minijuegos (sin navegador)
 npm run build
 python3 scripts/process_art.py   # regenera los sprites desde art/source/
+python3 scripts/make_sfx.py      # sonidos provisorios sintetizados
+python3 scripts/process_audio.py # audios de Flow (art/source/audio/) → public/game/sfx/
 ```
 
 ## Docs

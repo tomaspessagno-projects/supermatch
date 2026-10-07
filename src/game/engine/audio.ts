@@ -17,6 +17,7 @@ export const SOUNDS = [
   "finish",
   "fail",
   "cheer",
+  "laugh",
 ] as const;
 export type SoundName = (typeof SOUNDS)[number];
 
@@ -37,6 +38,7 @@ const VOLUME: Record<SoundName, number> = {
   finish: 0.7,
   fail: 0.7,
   cheer: 0.5,
+  laugh: 0.45,
 };
 
 export function loadSounds(k: KAPLAYCtx) {

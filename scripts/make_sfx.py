@@ -164,6 +164,15 @@ def sfx_cheer():
     return x * shape * 0.8
 
 
+def sfx_laugh():
+    # Risas de la tribuna: ruido filtrado cortado en "ja-ja-ja"
+    n = int(RATE * 1.4)
+    t = np.arange(n) / RATE
+    x = lowpass(noise(1.4), 0.3)
+    ha = 0.55 + 0.45 * np.sin(2 * np.pi * 5.5 * t)
+    return x * ha * np.minimum(1, t / 0.08) * decay(n, 1.8) * 0.8
+
+
 # --- música ----------------------------------------------------------------
 
 BPM = 150
@@ -231,6 +240,7 @@ SOUNDS = {
     "finish": sfx_finish,
     "fail": sfx_fail,
     "cheer": sfx_cheer,
+    "laugh": sfx_laugh,
     "music": music_loop,
 }
 

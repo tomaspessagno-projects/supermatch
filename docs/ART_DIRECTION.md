@@ -296,10 +296,101 @@ Style: 2D cartoon game art for a goofy TV game-show party game. Thick dark-purpl
 Isolated on a perfectly flat pure green (#00FF00) background with no shadows and no gradient; nothing touching the image edges; do not use green anywhere on the objects.
 ```
 
-### Música (video, solo se usa el audio) — **musica.mp4**
+## Sonido (Google Flow / Veo: se usa solo el audio)
 
+El juego ya suena con placeholders sintetizados (`scripts/make_sfx.py`). Cada audio
+de Flow reemplaza al placeholder del mismo nombre, sin tocar código:
+
+1. En Flow: *Text to Video*, 8 s. Pegar el prompt tal cual (la imagen no importa,
+   pero describirla ayuda a que el sonido salga bien).
+2. Descargar el video con el nombre en negrita y subirlo a `art/source/audio/`
+   (o pasarlo por el chat).
+3. `python3 scripts/process_audio.py` saca el audio, corta el silencio y el largo,
+   empareja el volumen y escribe `public/game/sfx/<nombre>.mp3`.
+
+Si un sonido sale con voces, música de fondo o repetido, conviene regenerarlo: el
+script recorta pero no limpia.
+
+### Efectos
+
+#### whistle.mp4 — silbato de largada y de "¡tiempo!"
 ```
-A simple looping animation of a spinning disco ball on a flat pure green (#00FF00) background, static camera. Audio: upbeat, goofy TV game-show music with brass, drums and claps, energetic, no vocals, loops seamlessly.
+Close-up of a cartoon referee blowing a metal whistle once, static camera, plain flat green background. Audio: one loud, sharp, high-pitched referee whistle blast lasting about one second, then complete silence. No music, no voices, no crowd.
+```
+
+#### count.mp4 — pip de la cuenta regresiva
+```
+A big digital countdown number on a game-show screen, static camera, plain dark background. Audio: one single short clean electronic beep, like a TV game-show countdown timer, then complete silence. No music, no voices.
+```
+
+#### jump.mp4 — salto
+```
+A cartoon contestant in sneakers jumps straight up once, side view, static camera, plain flat green background. Audio: one short comedic cartoon jump sound, a quick rising "whoop" slide whistle, under half a second, then silence. No music, no voices.
+```
+
+#### land.mp4 — aterrizaje
+```
+Cartoon sneakers land on a wet, soapy plastic floor, close-up, static camera. Audio: one soft wet thud with a tiny squeak of rubber soles, very short, then silence. No music, no voices.
+```
+
+#### wall.mp4 — choque contra la pared acolchada
+```
+A cartoon contestant bumps into a big padded foam wall and bounces back, side view, static camera. Audio: one dull, padded "thump" of a body hitting a soft foam cushion, short and comedic, then silence. No music, no voices.
+```
+
+#### bonk.mp4 — rodillo de goma ("¡BOING!")
+```
+A cartoon contestant gets knocked away by a giant pink rubber roller, side view, static camera, plain flat green background. Audio: one big comical springy rubber "boing" with a wobbly vibrating tail, classic cartoon sound effect, then silence. No music, no voices.
+```
+
+#### splash.mp4 — caída al agua ("¡PLAF!")
+```
+A cartoon contestant falls belly first into a pool of bright cyan water with a huge splash, side view, static camera. Audio: one big comedic belly-flop water splash with bubbles and droplets raining down, then silence. No music, no voices.
+```
+
+#### checkpoint.mp4 — bandera de control
+```
+A checkered flag pops up and waves on a game-show stage, static camera. Audio: a cheerful two-note bell chime "ding-ding", like a correct answer on a TV quiz show, then silence. No music, no voices.
+```
+
+#### finish.mp4 — llegada a la meta
+```
+Confetti cannons fire over a finish arch in a colorful TV game-show studio, static camera. Audio: a short triumphant brass fanfare "ta-da!" about two seconds long with a cymbal crash, then silence. No voices, no crowd.
+```
+
+#### fail.mp4 — "¡tiempo!" sin llegar
+```
+A cartoon contestant sits soaking wet and sad on a slippery bridge, static camera. Audio: a comedic sad trombone "wah wah wah waaah", the last note long and wobbly, then silence. No voices, no crowd.
+```
+
+#### cheer.mp4 — el público festeja
+```
+A TV studio audience in bleachers jumps and cheers under colorful spotlights, wide static shot. Audio: a live studio audience cheering, clapping and whistling enthusiastically for about three seconds, then fading out. No music, no announcer, no recognizable words.
+```
+
+#### laugh.mp4 — el público se ríe de una caída
+```
+A TV studio audience in bleachers points and laughs, wide static shot. Audio: a live studio audience bursting into big warm laughter with a few "ooooh!" reactions, about two seconds, then fading out. No music, no announcer, no recognizable words.
+```
+
+### Música
+
+Flow genera 8 s: alcanzan como loop corto. Si hay a mano un generador de música
+(Lyria, Suno, etc.), el mismo texto de *Audio* sirve como prompt para un tema largo.
+
+#### music.mp4 — música de las pruebas (loop)
+```
+A spinning disco ball over an empty, colorful TV game-show stage with moving spotlights, static camera. Audio: upbeat, goofy TV game-show music at 150 BPM in C major: punchy brass stabs, funky slap bass, snare rolls, hand claps and a bouncy synth lead; energetic, silly and playful; instrumental only, no vocals; steady tempo from start to end so it loops seamlessly.
+```
+
+#### menu.mp4 — música de la portada y el ranking (loop)
+```
+Slow pan across an empty TV game-show studio before the show starts, lights warming up. Audio: relaxed, groovy game-show lobby music at 110 BPM: muted trumpet melody, funky clean electric guitar, soft electric piano and light drums; cheerful and expectant; instrumental only, no vocals; steady tempo so it loops seamlessly.
+```
+
+#### win.mp4 — jingle del equipo ganador (tabla final)
+```
+Golden confetti rains over a winners' podium in a TV game-show studio, static camera. Audio: a five-second TV game-show victory jingle: a short snare drum roll, then a big brass fanfare with a cymbal crash and a final bright chord, with a live audience cheering underneath. No vocals.
 ```
 
 ## Pipeline
@@ -336,3 +427,6 @@ articulaciones del rig (cuello, hombro, cadera) están en `src/game/engine/conte
 | Tramo del puente | Integrado: textura repetida y recortada en cada charco |
 | Logo | Integrado en la portada |
 | Fuente | Luckiest Guy (Apache 2.0) en `public/game/fonts/` y vía `next/font` |
+| Sonido | Placeholders sintetizados integrados (12 efectos + música); esperando los de Flow |
+| Música de portada y jingle ganador | Pedidos (`menu`, `win`); se integran cuando lleguen |
+| Pruebas nuevas, presentador/a y árbitro | Pedidos (prompts de arriba) |

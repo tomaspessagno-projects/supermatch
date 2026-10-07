@@ -34,7 +34,7 @@ supermatch/
 │   │   ├── page.tsx                  # Landing + selector de facción
 │   │   ├── play/
 │   │   │   ├── page.tsx
-│   │   │   └── PlayScreen.tsx        # GameHost + HUD
+│   │   │   └── PlayScreen.tsx        # GameHost + HUD + carteles del episodio + botones táctiles
 │   │   ├── results/
 │   │   │   ├── page.tsx
 │   │   │   └── ResultsSummary.tsx
@@ -42,7 +42,12 @@ supermatch/
 │   │
 │   ├── components/
 │   │   ├── ui/                       # (pendiente) Exportados de Figma
-│   │   ├── hud/Hud.tsx               # Overlay React sobre el canvas
+│   │   ├── hud/
+│   │   │   ├── Hud.tsx               # Prueba n/3, puntaje en vivo, silencio
+│   │   │   └── TouchControls.tsx     # ◀ ▶ ⤒ en pantallas táctiles + "girá el celular"
+│   │   ├── episode/
+│   │   │   ├── EpisodeOverlay.tsx    # Presentación, 3-2-1, "¡YA!", tabla entre pruebas
+│   │   │   └── TeamRow.tsx           # Fila de tabla de equipos (episodio y resultados)
 │   │   └── TeamPicker.tsx            # Tarjetas con escudo por equipo
 │   │
 │   ├── game/                         # Mundo KAPLAY. TS puro.
@@ -52,6 +57,8 @@ supermatch/
 │   │   │   └── index.ts              # loadAssets(): sprites + fuente
 │   │   ├── engine/
 │   │   │   ├── createGame.ts         # Crea/destruye la instancia de KAPLAY
+│   │   │   ├── scene.ts              # SceneContext: lo que recibe cada minijuego
+│   │   │   ├── audio.ts              # Efectos, música en loop, silencio
 │   │   │   ├── physics.ts            # Helpers puros: approach, spring, colisiones
 │   │   │   ├── contestant.ts         # Rig del concursante (títere de cartón)
 │   │   │   └── fx.ts                 # Partículas, carteles y destellos
@@ -61,25 +68,32 @@ supermatch/
 │   │           ├── level.ts          # Layout fijo (charcos, rodillos, meta)
 │   │           ├── sim.ts            # Simulación pura: step(world, input, dt)
 │   │           ├── sim.test.ts       # El feel y las reglas, como tests
-│   │           ├── render.ts         # Dibuja el estado (cámara, ragdoll, efectos)
+│   │           ├── bot.ts            # Rivales: planificador + errores humanos por nivel
+│   │           ├── bot.test.ts       # Calibración: que se les pueda ganar
+│   │           ├── animator.ts       # Animación de un concursante (jugador o rival)
+│   │           ├── render.ts         # Dibuja el estado (cámara, ragdoll, rivales, efectos)
 │   │           └── index.ts          # Escena KAPLAY: input + paso fijo + render
 │   │
 │   ├── bridge/                       # Único punto de contacto React ⇄ KAPLAY
 │   │   ├── GameHost.tsx              # Monta el juego y traduce eventos ⇄ store
+│   │   ├── input.ts                  # Juego activo: botones táctiles y pips de la cuenta
 │   │   └── events.ts                 # Re-exporta los tipos del contrato para la UI
 │   │
-│   ├── store/session.ts              # Zustand: facción, resultados, puntaje en vivo, playlist
+│   ├── store/session.ts              # Zustand: facción, fase del episodio, resultados, rivales, silencio
 │   └── lib/
 │       ├── teams.ts                  # Facciones (espejo de public.teams)
-│       ├── minigames.ts              # Nombres de los minijuegos para la UI
+│       ├── minigames.ts              # Nombre, regla y controles de cada prueba
 │       ├── nicknames.ts              # Apodo al azar ("Pato Resbaloso")
 │       └── supabase/
 │           ├── client.ts             # Cliente del navegador (URL + publishable key)
 │           └── api.ts                # loadProfile, joinTeam, startRun, finishRun, ranking
 │
 ├── art/source/                       # Hojas originales generadas (fuente de verdad del arte)
+├── art/source/audio/                 # Audios de Flow (se procesan a public/game/sfx/)
 ├── scripts/process_art.py            # Hojas → sprites recortados + manifiesto
-├── public/game/                      # Sprites y fuente del juego
+├── scripts/make_sfx.py               # Sonidos provisorios sintetizados
+├── scripts/process_audio.py          # Audios de Flow → public/game/sfx/*.mp3
+├── public/game/                      # Sprites, fuente y sonidos (sfx/) del juego
 ├── public/ui/                        # Imágenes de la UI (escudos, concursante)
 ├── supabase/migrations/              # Esquema versionado (fuente de verdad)
 └── docs/
@@ -100,15 +114,24 @@ Las fuerza ESLint (`no-restricted-imports` en `eslint.config.mjs`):
    apodo). Si no, al elegir facción se crea una sesión anónima y el perfil
    (`players`) con un apodo al azar. La base no deja cambiar el equipo después.
 2. `GameHost` importa el motor, resetea el run en el store y manda
-   `minigame:start { slot: 1 }`. En paralelo, el store llama a `start_run()`
-   (el servidor fija la hora de inicio).
-3. Durante el minijuego el juego emite `minigame:score` (HUD en vivo, como mucho 10 por
-   segundo). Al terminar (y después de `endDelay` para ver el desenlace) emite
-   `minigame:finished { result }`. El bridge lo guarda y manda el siguiente slot según
-   `RUN_PLAYLIST`.
-4. Tras el tercero, `GameHost` llama a `onRunFinished` y se navega a `/results`.
-5. `/results` llama una sola vez a `finish_run(run_id, results)`: la base valida y suma
-   al equipo en la misma transacción. Volver a mostrar la pantalla no reenvía.
+   `minigame:start { slot: 1 }`: la escena se carga quieta, con los rivales en la
+   largada. En paralelo, el store llama a `start_run()` (el servidor fija la hora
+   de inicio).
+3. Cada prueba recorre las fases del store (`phase`), que dibuja `EpisodeOverlay`:
+   - `intro`: presentación con la regla y los controles; "¡A JUGAR!" pasa a
+   - `countdown`: 3-2-1, un `minigame:count` por número (pip y arranca la música);
+   - `playing`: `GameHost` manda `minigame:go` (silbato) y la escena empieza a
+     simular. El juego emite `minigame:score` (HUD en vivo, como mucho 10 por
+     segundo) y al terminar, después de `endDelay`, `minigame:finished { result,
+     rivals }`;
+   - `between`: tabla de equipos con tus puntos y los de los bots. Sigue sola a
+     los 7 s (o con el botón) a la `intro` de la prueba siguiente, que `GameHost`
+     carga con `minigame:start`. En la tercera dice "TABLA FINAL" y lleva a `/results`.
+4. Los rivales son bots de los otros 3 equipos que corren la misma simulación en la
+   misma pista. Sus puntos son cosméticos: solo se muestran en las tablas.
+5. `/results` muestra la tabla del episodio y llama una sola vez a
+   `finish_run(run_id, results)`: la base valida y suma al equipo en la misma
+   transacción. Volver a mostrar la pantalla no reenvía.
 6. `/leaderboard` lee `team_totals` y escucha sus UPDATEs por Realtime.
 
 **Sin conexión:** si Supabase no responde, se juega igual. El run no suma y la
