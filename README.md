@@ -19,4 +19,5 @@ npm run build
 ## Docs
 
 - [Arquitectura, decisiones y trampas conocidas](docs/ARCHITECTURE.md)
+- [Dirección de arte y prompts de imágenes](docs/ART_DIRECTION.md)
 - [Migraciones de base de datos](supabase/migrations/)
