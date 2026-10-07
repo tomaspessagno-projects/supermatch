@@ -1,21 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { wrapDegrees } from "../../engine/physics";
 import { plan as planner } from "./bot";
-import { LEVEL, type Level } from "./level";
+import { CANNON_WARNING, hammerHead, LEVEL, type Level, puddleAt, trampolineAt } from "./level";
 import {
   createWorld,
   finalScore,
+  liveScore,
   type SimEvent,
   type SimInput,
   step,
   type World,
 } from "./sim";
-import { SERVER_LIMITS, TUNING } from "./tuning";
+import { SCORING, SERVER_LIMITS, TUNING } from "./tuning";
 
 const DT = 1 / 120;
 const IDLE: SimInput = { move: 0, jumpPressed: false };
 const RIGHT: SimInput = { move: 1, jumpPressed: false };
-const FLAT: Level = { ...LEVEL, finishX: 1e6, puddles: [], rollers: [] };
+const FLAT: Level = {
+  ...LEVEL,
+  finishX: 1e6,
+  puddles: [],
+  rollers: [],
+  trampolines: [],
+  conveyors: [],
+  hammers: [],
+  cannons: [],
+  pompas: [],
+};
+const has = (events: SimEvent[], type: SimEvent["type"]) => events.some((e) => e.type === type);
 
 function runFor(world: World, input: SimInput, seconds: number): SimEvent[] {
   const events: SimEvent[] = [];
@@ -125,14 +137,18 @@ describe("Puente Resbaladizo · reglas", () => {
     expect(world.player.x).toBeLessThan(LEVEL.puddles[0].x1);
 
     const splashAt = world.time;
-    runUntil(world, () => RIGHT, (_, events) => events.some((e) => e.type === "respawn"));
+    runUntil(world, () => IDLE, (_, events) => events.some((e) => e.type === "respawn"));
     expect(world.time - splashAt).toBeCloseTo(TUNING.respawnDelay, 1);
     expect(world.player.x).toBe(LEVEL.checkpoints[0]);
-    expect(world.player.grounded).toBe(true);
+    // Reaparece cayendo sobre la bandera, y aterriza parado.
+    expect(world.player.grounded).toBe(false);
+    runUntil(world, () => IDLE, (_, events) => has(events, "land"), 1);
+    expect(world.player.x).toBe(LEVEL.checkpoints[0]);
+    expect(world.player.ragdoll).toBe(false);
   });
 
   it("pasar una bandera la vuelve el punto de reaparición", () => {
-    const world = createWorld({ ...LEVEL, puddles: [{ x0: 1500, x1: 1650 }], rollers: [] });
+    const world = createWorld({ ...FLAT, finishX: LEVEL.finishX, puddles: [{ x0: 1500, x1: 1650 }] });
     runUntil(world, () => RIGHT, (_, events) => events.some((e) => e.type === "splash"));
     expect(world.checkpoint).toBe(LEVEL.checkpoints[1]);
     runUntil(world, () => IDLE, (_, events) => events.some((e) => e.type === "respawn"));
@@ -159,16 +175,22 @@ describe("Puente Resbaladizo · reglas", () => {
     const world = createWorld(LEVEL);
     Object.assign(world, { outcome: "finished", endedAt: 0 });
     world.player.maxX = LEVEL.finishX;
+    world.pompas.fill(true);
     expect(finalScore(world)).toBeLessThanOrEqual(SERVER_LIMITS.maxScore);
   });
 
-  it.each(LEVEL.rollers.map((r) => [r.x, r] as const))(
-    "rodillo en x=%i a toda velocidad: si seguís apretando te salvás, si soltás, al agua",
+  it.each([
+    ["quieto", { x: 1600, radius: 42, clearance: 0, bob: 0, period: 1, phase: 0 }],
+    ["que sube y baja", { x: 1600, radius: 50, clearance: 4, bob: 120, period: 2.4, phase: 0 }],
+  ] as const)(
+    "rodillo %s a toda velocidad: si seguís apretando te salvás, si soltás, al agua",
     (_, roller) => {
+      // El charco está ~1150 px detrás del rodillo.
+      const level: Level = { ...FLAT, finishX: 1e6, rollers: [roller], puddles: [{ x0: roller.x - 1350, x1: roller.x - 1150 }] };
       const splashes = (keepPushing: boolean) => {
         // Busca un instante en que el rodillo esté abajo para forzar el choque.
         for (let t0 = 0; t0 < roller.period; t0 += 0.05) {
-          const world = createWorld(LEVEL);
+          const world = createWorld(level);
           world.time = t0;
           Object.assign(world.player, { x: roller.x - 600, vx: TUNING.maxRunSpeed });
           let bonked = false;
@@ -222,13 +244,142 @@ describe("Puente Resbaladizo · reglas", () => {
         // Sin pinball infinito: siempre se recupera el control entre golpes.
         if (events.some((e) => e.type === "bonk")) bonksWithoutControl++;
         if (!p.ragdoll && p.getUp === 0) bonksWithoutControl = 0;
-        expect(bonksWithoutControl).toBeLessThanOrEqual(1);
+        // Un golpe en el aire puede encadenar otro (martillo + pelota), pero nunca un pinball.
+        expect(bonksWithoutControl).toBeLessThanOrEqual(3);
       }
       const score = finalScore(world);
       expect(Number.isInteger(score)).toBe(true);
       expect(score).toBeGreaterThanOrEqual(0);
       expect(score).toBeLessThanOrEqual(SERVER_LIMITS.maxScore);
       expect(world.endedAt! * 1000).toBeGreaterThanOrEqual(SERVER_LIMITS.minDurationMs);
+    }
+  });
+});
+
+describe("Puente v2 · obstáculos", () => {
+  it("trampolín: lanza alto y el vuelo siempre se parece, vengas como vengas", () => {
+    const pad = { x0: 1000, x1: 1090 };
+    const flights = [150, 400, 620].map((speed) => {
+      const world = createWorld({ ...FLAT, trampolines: [pad] });
+      Object.assign(world.player, { x: 900, vx: speed });
+      runUntil(world, () => RIGHT, (_, events) => has(events, "launch"));
+      const from = world.player.x;
+      let apex = 0;
+      runUntil(world, () => RIGHT, (w) => {
+        apex = Math.max(apex, FLAT.floorY - w.player.y);
+        return w.player.grounded;
+      });
+      return { apex, distance: world.player.x - from };
+    });
+    for (const f of flights) {
+      expect(f.apex).toBeGreaterThan(400);
+      expect(f.distance).toBeGreaterThan(450);
+      expect(f.distance).toBeLessThan(650);
+    }
+  });
+
+  it("los trampolines del nivel aterrizan en piso firme o en otro trampolín (apretando o soltando)", () => {
+    for (const pad of LEVEL.trampolines) {
+      for (const input of [RIGHT, IDLE]) {
+        for (const speed of [250, 450, 620]) {
+          const world = createWorld({ ...LEVEL, rollers: [], hammers: [], cannons: [] });
+          world.checkpoint = pad.x0 - 100;
+          Object.assign(world.player, { x: pad.x0 - 15, vx: speed });
+          runUntil(world, () => input, (_, events) => has(events, "launch"));
+          const events = runFor(world, input, 3);
+          expect(has(events, "splash"), `trampolín en ${pad.x0} a ${speed} px/s`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("cinta de goma: parado te lleva para atrás; corriendo avanzás, pero despacio", () => {
+    const belt = { x0: 1000, x1: 3000, speed: -250 };
+    const still = createWorld({ ...FLAT, conveyors: [belt] });
+    Object.assign(still.player, { x: 1500, vx: 0 });
+    runFor(still, IDLE, 0.5);
+    expect(still.player.vx).toBeCloseTo(belt.speed, 0);
+
+    const runner = createWorld({ ...FLAT, conveyors: [belt] });
+    Object.assign(runner.player, { x: 1500, vx: TUNING.maxRunSpeed });
+    runFor(runner, RIGHT, 0.5);
+    expect(runner.player.vx).toBeGreaterThan(0);
+    expect(runner.player.vx).toBeLessThan(TUNING.maxRunSpeed / 3);
+  });
+
+  it("martillo: abajo te barre para el lado al que va; arriba te pasa por encima", () => {
+    const hammer = { x: 1500, length: 230, radius: 40, amplitude: 0.85, period: 2.4, phase: 0 };
+    // phase 0: en t = 0 pasa por abajo yendo hacia la derecha.
+    const hit = createWorld({ ...FLAT, hammers: [hammer] });
+    Object.assign(hit.player, { x: hammer.x });
+    const events = runFor(hit, IDLE, 0.05);
+    expect(events).toContainEqual(expect.objectContaining({ type: "bonk", by: "hammer" }));
+    expect(hit.player.vx).toBeGreaterThan(0);
+
+    // Un cuarto de período después está en el extremo, alto: no toca a nadie abajo del eje.
+    const safe = createWorld({ ...FLAT, hammers: [hammer] });
+    safe.time = hammer.period / 4;
+    Object.assign(safe.player, { x: hammer.x });
+    expect(has(runFor(safe, IDLE, 0.1), "bonk")).toBe(false);
+    // En el extremo la cabeza sube: barre el tablón solo cerca del medio.
+    expect(hammerHead(FLAT, hammer, safe.time).y).toBeLessThan(hammerHead(FLAT, hammer, 0).y - 60);
+  });
+
+  it("cañón: avisa antes de cada disparo; la pelota te voltea, saltándola pasa por abajo", () => {
+    const cannon = { x: 2000, interval: 2.2, phase: 1, range: 800 };
+    const world = createWorld({ ...FLAT, cannons: [cannon] });
+    Object.assign(world.player, { x: 1600 });
+    const at: Partial<Record<SimEvent["type"], number>> = {};
+    const events: SimEvent[] = [];
+    runUntil(world, () => IDLE, (w, step) => {
+      for (const e of step) at[e.type] ??= w.time;
+      events.push(...step);
+      return w.time > 2.4;
+    });
+    expect(at.fire! - at.aim!).toBeCloseTo(CANNON_WARNING, 1);
+    expect(events).toContainEqual(expect.objectContaining({ type: "bonk", by: "ball" }));
+
+    const jumper = createWorld({ ...FLAT, cannons: [cannon] });
+    Object.assign(jumper.player, { x: 1600 });
+    // La pelota sale en t = 1 y tarda ~0,85 s en llegar: saltar a los 1,6 s.
+    const dodged = runUntil(jumper, (w) => ({ move: 0, jumpPressed: w.time > 1.6 && w.time < 1.61 }), (w) => w.time > 2.4);
+    expect(has(dodged, "bonk")).toBe(false);
+  });
+
+  it("pompa: suma puntos una sola vez", () => {
+    const world = createWorld({ ...FLAT, pompas: [{ x: 1000, y: FLAT.floorY - 40 }] });
+    Object.assign(world.player, { x: 900, vx: 300 });
+    const events = runFor(world, RIGHT, 1);
+    expect(events.filter((e) => e.type === "pompa")).toHaveLength(1);
+    world.player.maxX = world.level.startX;
+    expect(liveScore(world)).toBe(SCORING.pompaPoints);
+  });
+});
+
+describe("Puente v2 · diseño del nivel", () => {
+  it("las pompas valen 150 en total y todas se pueden alcanzar", () => {
+    expect(LEVEL.pompas.length * SCORING.pompaPoints).toBe(150);
+    for (const pompa of LEVEL.pompas) {
+      const height = LEVEL.floorY - pompa.y;
+      // Saltando el cuerpo llega a ~256 px; con un trampolín, a ~520.
+      const nearPad = LEVEL.trampolines.some((t) => pompa.x > t.x0 && pompa.x - t.x0 < 700);
+      expect(height, `pompa en x=${pompa.x}`).toBeLessThan(nearPad ? 520 : 250);
+    }
+  });
+
+  it("nunca hay más de 1600 px entre una bandera y la siguiente (o la meta)", () => {
+    const flags = [...LEVEL.checkpoints, LEVEL.finishX];
+    for (let i = 1; i < flags.length; i++) expect(flags[i] - flags[i - 1]).toBeLessThanOrEqual(1600);
+  });
+
+  it("las banderas están en piso firme, lejos de cintas, trampolines, martillos y pelotas", () => {
+    for (const x of LEVEL.checkpoints) {
+      expect(puddleAt(LEVEL, x), `bandera ${x}`).toBeUndefined();
+      expect(trampolineAt(LEVEL, x), `bandera ${x}`).toBeUndefined();
+      expect(LEVEL.conveyors.some((c) => x >= c.x0 - 50 && x <= c.x1 + 50), `bandera ${x}`).toBe(false);
+      expect(LEVEL.hammers.some((h) => Math.abs(x - h.x) < h.length * Math.sin(h.amplitude) + h.radius + 40)).toBe(false);
+      expect(LEVEL.cannons.some((c) => x < c.x && x > c.x - c.range - 40), `bandera ${x}`).toBe(false);
+      expect(LEVEL.rollers.some((r) => Math.abs(x - r.x) < 200), `bandera ${x}`).toBe(false);
     }
   });
 });

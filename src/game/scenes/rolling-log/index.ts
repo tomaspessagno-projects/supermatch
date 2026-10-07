@@ -1,6 +1,7 @@
 import type { KAPLAYCtx } from "kaplay";
 import type { MinigameStart } from "../../contract";
 import type { SceneContext } from "../../engine/scene";
+import { createTimeFx, type TimeFx } from "../../engine/timefx";
 import { BOT_SKILLS, createBot, rivalScore, stepBot } from "./bot";
 import { LOG_LEVEL } from "./level";
 import { createRenderer } from "./render";
@@ -23,7 +24,8 @@ const KEYS = {
 export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
   const { audio } = ctx;
 
-  function playSounds(events: readonly SimEvent[]) {
+  /** Sonidos y ritmo (congelado, cámara lenta) de lo que le pasa al jugador. */
+  function feel(events: readonly SimEvent[], time: TimeFx) {
     for (const e of events) {
       switch (e.type) {
         case "jump":
@@ -40,6 +42,7 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
           break;
         case "hit":
           audio.play("bonk", { vary: 1 });
+          time.hitStop(0.08);
           break;
         case "pop":
           audio.play("pop", { vary: 2 });
@@ -50,12 +53,14 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
         case "splash":
           audio.play("splash", { vary: 1 });
           audio.play("whistle", { volume: 0.5 });
+          time.slowMo(0.3, 0.55);
           break;
         case "finish":
           audio.play("whistle");
           audio.play("finish");
           audio.play("cheer");
           audio.duckMusic(true);
+          time.slowMo(0.4, 0.8);
           break;
         case "out":
           audio.play("fail");
@@ -76,7 +81,8 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
       bot: createBot(skills[i % skills.length], seed + i),
     }));
 
-    const renderer = createRenderer(k, ctx.team.color, rivals.map((r) => r.team.color));
+    const renderer = createRenderer(k, ctx.team.color, rivals.map((r) => r.team));
+    const time = createTimeFx();
     let started = false;
     let accumulator = 0;
     let jumpQueued = false;
@@ -99,20 +105,22 @@ export function registerRollingLog(k: KAPLAYCtx, ctx: SceneContext) {
       const left = k.isKeyDown([...KEYS.left]) || ctx.buttons.left;
       const move = (right ? 1 : 0) - (left ? 1 : 0);
 
+      // Congelado de impacto y cámara lenta: cambian el ritmo, no la simulación.
+      const dt = Math.min(k.dt(), MAX_FRAME) * (started ? time.scale(k.dt()) : 1);
       if (started) {
-        accumulator += Math.min(k.dt(), MAX_FRAME);
+        accumulator += dt;
         while (accumulator >= STEP) {
           accumulator -= STEP;
           const events = step(world, { move, jumpPressed: jumpQueued }, STEP);
           renderer.react(events, world);
-          playSounds(events);
+          feel(events, time);
           jumpQueued = false;
           rivals.forEach((r, i) => renderer.reactRival(i, stepBot(r.world, r.bot), r.world));
         }
       } else {
         jumpQueued = false;
       }
-      renderer.update(k.dt(), world, rivals.map((r) => r.world), started ? move : 0);
+      renderer.update(started ? dt : k.dt(), world, rivals.map((r) => r.world), started ? move : 0);
 
       const current = score(world);
       if (current !== lastScore && world.time - lastScoreAt >= SCORE_EMIT_INTERVAL) {

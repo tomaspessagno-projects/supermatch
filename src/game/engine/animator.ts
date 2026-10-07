@@ -32,6 +32,7 @@ export function createAnimator() {
   let squashVel = 0;
   let screamFor = 0;
   let facing: 1 | -1 = 1;
+  let lastMove = 0;
 
   return {
     react(events: readonly AnimEvent[]) {
@@ -53,17 +54,28 @@ export function createAnimator() {
       [squash, squashVel] = spring(squash, squashVel, 1, 320, 12, dt);
       screamFor = Math.max(0, screamFor - dt);
       if (move !== 0 && !body.ragdoll) facing = move > 0 ? 1 : -1;
+      lastMove = move;
     },
 
-    pose(body: AnimatedBody, time: number, { yOffset = 0, opacity = 1 } = {}): ContestantPose {
+    /** `celebrate`: ganó, festeja saltando con los brazos arriba. */
+    pose(body: AnimatedBody, time: number, { yOffset = 0, opacity = 1, celebrate = false } = {}): ContestantPose {
       const t = time;
       const lying = body.getUp > 0;
       const tumbling = body.ragdoll && !body.grounded;
       const airborne = !body.grounded && !body.ragdoll;
 
+      // Patina sin control (o frenando de golpe): revolea los brazos como molino.
+      const sliding =
+        body.grounded && !body.ragdoll && !lying && Math.abs(body.vx) > 420 && (lastMove === 0 || lastMove * body.vx < 0);
+
       let legs: [number, number];
       let arms: [number, number];
-      if (tumbling) {
+      let hop = 0;
+      if (celebrate && body.grounded && !body.ragdoll) {
+        hop = Math.abs(Math.sin(t * 7)) * 18;
+        legs = [-10 - Math.sin(t * 14) * 12, 10 + Math.sin(t * 14) * 12];
+        arms = [170 + Math.sin(t * 12) * 25, 190 + Math.cos(t * 12) * 25];
+      } else if (tumbling) {
         legs = [Math.sin(t * 18) * 45, -Math.sin(t * 18 + 1) * 45];
         arms = [Math.sin(t * 20) * 130, Math.cos(t * 17) * 130];
       } else if (lying) {
@@ -72,6 +84,10 @@ export function createAnimator() {
       } else if (airborne || body.sinking) {
         legs = [-25 + Math.sin(t * 16) * 10, 35 + Math.sin(t * 15) * 10];
         arms = [-150 + Math.sin(t * 16) * 30, 150 + Math.sin(t * 14) * 30];
+      } else if (sliding) {
+        const spin = (t * 900) % 360;
+        legs = [-12, 18];
+        arms = [spin, (spin + 180) % 360];
       } else {
         const swing = Math.sin(runPhase) * 38;
         legs = [-swing, swing];
@@ -80,11 +96,11 @@ export function createAnimator() {
 
       let expression: Expression = "normal";
       if (body.ragdoll || lying) expression = "dizzy";
-      else if (body.sinking || screamFor > 0 || (airborne && body.vy > 250)) expression = "scream";
+      else if (body.sinking || screamFor > 0 || sliding || (airborne && body.vy > 250)) expression = "scream";
 
       return {
         x: body.x,
-        y: body.y + yOffset,
+        y: body.y + yOffset - hop,
         lean: body.lean,
         facing,
         squash,

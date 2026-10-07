@@ -44,9 +44,9 @@ describe("rivales", () => {
       seeds.map((seed) => finalScore(race(skill, seed))).reduce((a, b) => a + b, 0) / seeds.length;
     const [ace, average, clumsy] = [mean("ace"), mean("average"), mean("clumsy")];
     console.info(`puntaje medio: as ${ace.toFixed(0)}, promedio ${average.toFixed(0)}, torpe ${clumsy.toFixed(0)}`);
-    // Persona que llega en 30 s: 600 + 150 + 250·(1 − 30/45) ≈ 833.
-    expect(average).toBeLessThan(833);
-    expect(clumsy).toBeLessThan(average - 150);
+    // Persona que llega en 35 s con 5 pompas: 500 + 75 + 150 + 200·(1 − 35/45) ≈ 770.
+    expect(average).toBeLessThan(770);
+    expect(clumsy).toBeLessThan(average);
     expect(ace).toBeGreaterThan(average);
   });
 

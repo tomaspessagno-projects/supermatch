@@ -14,8 +14,9 @@ export function Hud() {
   const toggleMuted = useSession((s) => s.toggleMuted);
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-3 sm:p-4">
-      <p className="text-cartoon text-lg text-white sm:text-2xl">
+    // Tamaños según el ancho del cuadro de juego (en el celular es chico).
+    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-4 @max-3xl:p-1.5">
+      <p className="text-cartoon text-2xl text-white @max-3xl:text-xs">
         PRUEBA{" "}
         <span data-testid="hud-slot" className="text-sun">
           {Math.min(slot, RUN_PLAYLIST.length)}/{RUN_PLAYLIST.length}
@@ -23,9 +24,9 @@ export function Hud() {
       </p>
       <div className="flex items-center gap-2">
         {team && (
-          <Image src={`/ui/badge-${team}.png`} alt="" width={186} height={186} className="size-8 sm:size-10" />
+          <Image src={`/ui/badge-${team}.png`} alt="" width={186} height={186} className="size-10 @max-3xl:size-5" />
         )}
-        <span data-testid="hud-score" className="text-cartoon text-2xl text-white tabular-nums sm:text-4xl">
+        <span data-testid="hud-score" className="text-cartoon text-4xl text-white tabular-nums @max-3xl:text-base">
           {banked + liveScore}
         </span>
         {/* Por encima de los carteles del episodio: se puede silenciar en cualquier momento. */}
@@ -37,7 +38,7 @@ export function Hud() {
           aria-label={muted ? "Activar sonido" : "Silenciar"}
           aria-pressed={muted}
           data-testid="mute"
-          className="pointer-events-auto relative z-20 ml-1 grid size-9 place-items-center rounded-full border-4 border-ink bg-white/20 text-lg backdrop-blur-sm sm:size-11"
+          className="pointer-events-auto relative z-20 ml-1 grid size-11 place-items-center rounded-full border-4 border-ink bg-white/20 text-lg backdrop-blur-sm @max-3xl:size-7 @max-3xl:border-2 @max-3xl:text-xs"
         >
           {muted ? "🔇" : "🔊"}
         </button>

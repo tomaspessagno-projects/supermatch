@@ -55,7 +55,10 @@ export function GameHost({ team }: GameHostProps) {
     ]).then(([{ createGame }]) => {
       if (disposed) return;
       session().startRun();
-      const info = (id: string) => ({ id, color: TEAMS.find((t) => t.id === id)!.color });
+      const info = (id: string) => {
+        const t = TEAMS.find((t) => t.id === id)!;
+        return { id, color: t.color, name: t.name.replace(/^Equipo /, "") };
+      };
       const current = createGame({
         root,
         team: info(team),

@@ -1,6 +1,6 @@
 import { clamp } from "../../engine/physics";
 import { mulberry32 } from "../../engine/random";
-import { finalScore, type SimInput, step, type World } from "./sim";
+import { cloneWorld, finalScore, pompaCount, type SimInput, step, type World } from "./sim";
 import { SCORING, TUNING } from "./tuning";
 
 /**
@@ -36,7 +36,8 @@ export const BOT_SKILLS = {
 export function plan(world: World): SimInput {
   const p = world.player;
   if (world.respawnIn > 0 || !p.grounded || p.ragdoll || p.getUp > 0) return RIGHT;
-  const runningIsSafe = isSafe(world, RIGHT, 0.6);
+  // Un horizonte de 1 s alcanza para pasar un martillo o una pelota sin frenar a mitad de camino.
+  const runningIsSafe = isSafe(world, RIGHT, 1);
   if (!runningIsSafe && isSafe(world, JUMP, 1)) return JUMP;
   if (runningIsSafe || isSafe(world, RIGHT, 0.2)) return RIGHT;
   if (isSafe(world, IDLE, 0.6)) return IDLE;
@@ -44,7 +45,7 @@ export function plan(world: World): SimInput {
 }
 
 function isSafe(world: World, first: SimInput, horizon: number): boolean {
-  const sim: World = { ...world, player: { ...world.player } };
+  const sim = cloneWorld(world);
   for (let t = 0; t < horizon; t += DT) {
     const input = t === 0 ? first : t < 0.1 ? { ...first, jumpPressed: false } : RIGHT;
     const events = step(sim, input, DT);
@@ -106,10 +107,15 @@ export function projectedScore(world: World): number {
   const eta = world.time + (finishX - world.player.maxX) / Math.max(pace, 1);
   if (eta >= TUNING.timeLimit) {
     const progress = clamp((covered + pace * (TUNING.timeLimit - world.time)) / (finishX - startX), 0, 1);
-    return Math.round(SCORING.distancePoints * progress);
+    return Math.round(SCORING.distancePoints * progress) + pompaCount(world) * SCORING.pompaPoints;
   }
   const timeLeft = clamp(1 - eta / TUNING.timeLimit, 0, 1);
-  return SCORING.distancePoints + SCORING.finishPoints + Math.round(SCORING.timeBonusPoints * timeLeft);
+  return (
+    SCORING.distancePoints +
+    pompaCount(world) * SCORING.pompaPoints +
+    SCORING.finishPoints +
+    Math.round(SCORING.timeBonusPoints * timeLeft)
+  );
 }
 
 

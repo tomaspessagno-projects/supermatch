@@ -25,6 +25,22 @@ export const TUNING = {
   getUpTime: 0.35, // s tirado en el piso, frenando, antes de recuperar el control
   hitCooldown: 0.35,
 
+  // Martillos y pelotas de espuma: empujan menos que un rodillo
+  hammerKnock: 650, // px/s para el lado al que va la cabeza
+  hammerLift: 500,
+  ballKnock: 480, // px/s hacia atrás
+  ballLift: 380,
+
+  // Trampolín: lanza alto (≈ 440 px) con una velocidad horizontal acotada,
+  // así el arco es predecible (vuela entre ~480 y ~600 px).
+  trampolineSpeed: 1450,
+  trampolineMinVx: 400,
+  trampolineMaxVx: 500,
+
+  // Cinta de goma: ahí sí hay agarre, pero te arrastra
+  beltGrip: 1800, // px/s² para alcanzar la velocidad de la cinta + la tuya
+  beltRunSpeed: 360, // corriendo sobre la cinta, respecto de la goma
+
   // Pared de largada (bumper de pinball)
   wallRestitution: 0.8,
 
@@ -43,6 +59,7 @@ export const TUNING = {
   drownDepth: 140, // px bajo el piso: splash
   respawnDelay: 1.5, // s bajo el agua antes de volver a la última bandera
   respawnGrace: 0.5, // s sin que los rodillos lo golpeen al reaparecer
+  respawnDrop: 260, // px: reaparece cayendo desde arriba de la bandera
 
   // Partida
   timeLimit: 45, // s
@@ -52,9 +69,10 @@ export const TUNING = {
 export const PLAYER_SIZE = { width: 36, height: 88 } as const;
 
 export const SCORING = {
-  distancePoints: 600, // proporcional a lo más lejos que llegaste
+  distancePoints: 500, // proporcional a lo más lejos que llegaste
   finishPoints: 150, // por cruzar la meta
-  timeBonusPoints: 250, // proporcional al tiempo que sobró
+  timeBonusPoints: 200, // proporcional al tiempo que sobró
+  pompaPoints: 15, // por cada pompa dorada (10 en el nivel = 150)
 } as const;
 
 /**

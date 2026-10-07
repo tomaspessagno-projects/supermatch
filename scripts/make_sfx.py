@@ -198,6 +198,14 @@ def sfx_pop():
     return mix((0, plop), (0.03, sparkle))
 
 
+def sfx_spring():
+    # Trampolín: "boiiing" que sube, con vibrato de resorte
+    t = t_axis(0.6)
+    freq = 180 * (1 + 2.2 * t / 0.6) * (1 + 0.1 * np.sin(2 * np.pi * 22 * t))
+    x = np.sin(2 * np.pi * np.cumsum(freq) / RATE)
+    return x * decay(len(x), 4) * env(len(x), 0.003, 0.12)
+
+
 # --- música ----------------------------------------------------------------
 
 BPM = 150
@@ -269,6 +277,7 @@ SOUNDS = {
     "cannon": sfx_cannon,
     "creak": sfx_creak,
     "pop": sfx_pop,
+    "spring": sfx_spring,
     "music": music_loop,
 }
 

@@ -20,6 +20,20 @@ describe("physics", () => {
     expect(value).toBeCloseTo(10, 2);
   });
 
+  it("spring no se dispara con frames lentos (10 fps)", () => {
+    let [value, velocity] = [1.5, 0];
+    for (let i = 0; i < 100; i++) [value, velocity] = spring(value, velocity, 1, 320, 12, 0.1);
+    expect(value).toBeCloseTo(1, 3);
+  });
+
+  it("spring con el paso fijo de la simulación es un paso simple (no cambia los resultados)", () => {
+    const dt = 1 / 120;
+    const [value, velocity] = spring(2, 3, 0, 90, 9, dt);
+    const accel = -90 * 2 - 9 * 3;
+    expect(velocity).toBe(3 + accel * dt);
+    expect(value).toBe(2 + (3 + accel * dt) * dt);
+  });
+
   it("wrapDegrees deja el ángulo en (-180, 180]", () => {
     expect(wrapDegrees(370)).toBeCloseTo(10);
     expect(wrapDegrees(-190)).toBeCloseTo(170);

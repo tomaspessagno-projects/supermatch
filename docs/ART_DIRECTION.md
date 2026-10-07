@@ -378,6 +378,11 @@ Close-up of a giant wooden log slowly turning in a TV game-show pool, static cam
 A shiny golden soap bubble bursts with sparkles, close-up, static camera, plain dark background. Audio: one bright, short bubble "pop" followed by a tiny magical sparkle chime, then silence. No music, no voices.
 ```
 
+#### spring.mp4 — trampolín
+```
+A cartoon contestant bounces high off an inflatable trampoline, side view, static camera, plain flat green background. Audio: one big comical springy "boiiing" that rises in pitch, like a cartoon spring, then silence. No music, no voices.
+```
+
 #### cheer.mp4 — el público festeja
 ```
 A TV studio audience in bleachers jumps and cheers under colorful spotlights, wide static shot. Audio: a live studio audience cheering, clapping and whistling enthusiastically for about three seconds, then fading out. No music, no announcer, no recognizable words.
@@ -387,6 +392,28 @@ A TV studio audience in bleachers jumps and cheers under colorful spotlights, wi
 ```
 A TV studio audience in bleachers points and laughs, wide static shot. Audio: a live studio audience bursting into big warm laughter with a few "ooooh!" reactions, about two seconds, then fading out. No music, no announcer, no recognizable words.
 ```
+
+### Voces del presentador
+
+Frases cortas para los momentos del programa. Mismo personaje en todas (pegar la
+descripción entera cada vez para que la voz salga parecida). Se suben como
+`host-<nombre>.mp4`.
+
+Descripción común (va al principio de cada prompt):
+```
+A cheerful, over-the-top TV game-show host with huge orange hair and a sparkly purple jacket, holding a microphone, talking straight to camera in a colorful studio, static medium shot. He speaks Rioplatense Spanish (Argentina) with lots of energy, like a classic 90s TV host.
+```
+
+| Archivo | Lo que dice (agregar después de la descripción) |
+|---|---|
+| `host-start.mp4` | `He shouts: "¡Bienvenidos a Supermatch! ¡Que empiece el show!" Then he smiles. No music.` |
+| `host-splash.mp4` | `He laughs and shouts: "¡Al agua, pato!" No music.` |
+| `host-fall.mp4` | `He covers his mouth, then shouts: "¡Uhhh, qué porrazo!" No music.` |
+| `host-finish.mp4` | `He raises his arms and shouts: "¡Llegó! ¡Llegó! ¡Tremendo!" No music.` |
+| `host-close.mp4` | `He shouts with suspense: "¡Está peleadísimo!" No music.` |
+| `host-lead.mp4` | `He points at the camera and shouts: "¡Se escapa! ¡Nadie lo para!" No music.` |
+| `host-last.mp4` | `He shouts: "¡Última prueba! ¡Ahora o nunca!" No music.` |
+| `host-winner.mp4` | `He shouts: "¡Y el ganador del episodio es...!" Then a short drum roll. No music.` |
 
 ### Música
 
@@ -444,10 +471,11 @@ articulaciones del rig (cuello, hombro, cadera) están en `src/game/engine/conte
 | Tramo del puente | Integrado: textura repetida y recortada en cada charco |
 | Logo | Integrado en la portada |
 | Fuente | Luckiest Guy (Apache 2.0) en `public/game/fonts/` y vía `next/font` |
-| Sonido | Placeholders sintetizados integrados (15 efectos + música); esperando los de Flow |
+| Sonido | Placeholders sintetizados integrados (16 efectos + música); esperando los de Flow |
 | Música de portada y jingle ganador | Pedidos (`menu`, `win`); se integran cuando lleguen |
 | El Tronco Loco (`props-tronco`) | Integrado: tronco, soporte, cañones, pelotas, burbujas |
-| Puente v2 (`props-puente-v2`) | Recortado; ya se usan las banderas. El resto entra con la Fase 2.3 |
+| Puente v2 (`props-puente-v2`) | Integrado: trampolín, martillo, banderas, pompas, tiburón; la cinta se dibuja por código |
 | Presentador/a | Integrado: cabeza que habla en presentación, tabla y resultados |
 | Árbitro | Integrado: silbato en la largada y la cuenta, tarjeta roja, bandera al final |
-| Baldes al Tanque (`props-baldes`) | Falta |
+| Baldes al Tanque (`props-baldes`) | Generada; falta subirla a `art/source/` |
+| Voces del presentador | Pedidas (prompts de arriba) |

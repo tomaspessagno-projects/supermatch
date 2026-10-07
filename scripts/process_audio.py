@@ -34,6 +34,7 @@ MAX_SECONDS = {
     "cannon": 0.8,
     "creak": 1.2,
     "pop": 0.5,
+    "spring": 1.0,
     "win": 6.0,
 }
 # Música en loop: no se recorta ni se le saca el silencio del final.

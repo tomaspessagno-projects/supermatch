@@ -20,8 +20,8 @@ export type MinigameResult = MinigameStart & {
   durationMs: number;
 };
 
-/** Un equipo en cancha: id (de public.teams) y color de camiseta. */
-export type TeamInfo = { id: string; color: string };
+/** Un equipo en cancha: id (de public.teams), color de camiseta y nombre corto ("Azul"). */
+export type TeamInfo = { id: string; color: string; name: string };
 
 /** Puntaje de un rival manejado por la computadora (cosmético, no se envía). */
 export type RivalResult = { teamId: string; score: number };

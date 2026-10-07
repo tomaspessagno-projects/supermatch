@@ -5,7 +5,17 @@ import {
   spring,
   wrapDegrees,
 } from "../../engine/physics";
-import { type Level, puddleAt, rollerCenterY } from "./level";
+import {
+  BALL_RADIUS,
+  CANNON_WARNING,
+  cannonBalls,
+  conveyorAt,
+  hammerHead,
+  type Level,
+  puddleAt,
+  rollerCenterY,
+  trampolineAt,
+} from "./level";
 import { PLAYER_SIZE, SCORING, TUNING } from "./tuning";
 
 /**
@@ -36,6 +46,8 @@ export type Player = {
   hitCooldown: number;
   jumpBuffer: number;
   maxX: number;
+  /** Vuela por un trampolín: en el aire no acelera más que el tope del trampolín. */
+  launched: boolean;
 };
 
 export type World = {
@@ -47,6 +59,10 @@ export type World = {
   falls: number;
   /** Segundos bajo el agua antes de reaparecer (0 = en juego). */
   respawnIn: number;
+  /** Pompas doradas ya agarradas (por índice del nivel). */
+  pompas: boolean[];
+  /** Pelotas de cañón que ya golpearon ("cañón:disparo"): no golpean de nuevo. */
+  spentBalls: string[];
   outcome: Outcome | null;
   endedAt: number | null;
 };
@@ -62,7 +78,13 @@ export type SimEvent =
   | { type: "jump" }
   | { type: "land"; impact: number }
   | { type: "wall"; impact: number }
-  | { type: "bonk"; x: number; y: number }
+  /** Un golpe que lo despide: rodillo, martillo o pelota. */
+  | { type: "bonk"; x: number; y: number; by: "roller" | "hammer" | "ball" }
+  | { type: "launch"; x: number }
+  | { type: "pompa"; x: number; y: number }
+  /** El cañón en `x` tiembla: dispara en `CANNON_WARNING` s. */
+  | { type: "aim"; x: number }
+  | { type: "fire"; x: number }
   | { type: "splash"; x: number }
   | { type: "checkpoint"; x: number }
   | { type: "respawn"; x: number }
@@ -70,6 +92,7 @@ export type SimEvent =
   | { type: "timeout" };
 
 const HALF_WIDTH = PLAYER_SIZE.width / 2;
+const POMPA_RADIUS = 30; // generosa: agarrarla tiene que sentirse fácil una vez que te animás
 
 export function createWorld(level: Level): World {
   return {
@@ -78,10 +101,32 @@ export function createWorld(level: Level): World {
     checkpoint: level.startX,
     falls: 0,
     respawnIn: 0,
+    pompas: level.pompas.map(() => false),
+    spentBalls: [],
     outcome: null,
     endedAt: null,
     player: standingAt(level, level.startX, level.startX),
   };
+}
+
+/** Copia independiente del mundo (para que los bots prueben jugadas). */
+export function cloneWorld(world: World): World {
+  return {
+    ...world,
+    player: { ...world.player },
+    pompas: [...world.pompas],
+    spentBalls: [...world.spentBalls],
+  };
+}
+
+/** Pompas agarradas. */
+export function pompaCount(world: World): number {
+  return world.pompas.filter(Boolean).length;
+}
+
+/** Reaparece cayendo sobre la bandera: se ve venir y aterriza con un "¡PUF!". */
+function droppingAt(level: Level, x: number, maxX: number): Player {
+  return { ...standingAt(level, x, maxX), y: level.floorY - TUNING.respawnDrop, grounded: false };
 }
 
 function standingAt(level: Level, x: number, maxX: number): Player {
@@ -100,6 +145,7 @@ function standingAt(level: Level, x: number, maxX: number): Player {
     hitCooldown: 0,
     jumpBuffer: 0,
     maxX,
+    launched: false,
   };
 }
 
@@ -110,12 +156,13 @@ export function step(world: World, input: SimInput, dt: number): SimEvent[] {
   const p = world.player;
 
   world.time += dt;
+  cannonEvents(world, dt, events);
 
   // Bajo el agua: el reloj sigue corriendo (esa es la penalización).
   if (world.respawnIn > 0) {
     world.respawnIn = Math.max(0, world.respawnIn - dt);
     if (world.respawnIn === 0 && world.outcome === null) {
-      world.player = standingAt(level, world.checkpoint, p.maxX);
+      world.player = droppingAt(level, world.checkpoint, p.maxX);
       world.player.hitCooldown = TUNING.respawnGrace;
       events.push({ type: "respawn", x: world.checkpoint });
     }
@@ -133,12 +180,17 @@ export function step(world: World, input: SimInput, dt: number): SimEvent[] {
   if (inControl && input.jumpPressed) p.jumpBuffer = TUNING.jumpBuffer;
 
   // Horizontal: en el piso casi no hay fricción; en el aire casi no hay control.
+  // Sobre la cinta de goma es al revés: agarra, pero te lleva para atrás.
   const prevVx = p.vx;
-  if (move !== 0 && move * p.vx < TUNING.maxRunSpeed) {
+  const belt = p.grounded ? conveyorAt(level, p.x) : undefined;
+  if (belt) {
+    const run = p.getUp > 0 ? 0 : move * TUNING.beltRunSpeed;
+    p.vx = approach(p.vx, belt.speed + run, TUNING.beltGrip * dt);
+  } else if (move !== 0 && move * p.vx < (p.launched ? TUNING.trampolineMaxVx : TUNING.maxRunSpeed)) {
     const accel = p.grounded ? TUNING.groundAccel : TUNING.airAccel;
     p.vx += move * accel * dt;
   }
-  if (p.grounded) {
+  if (p.grounded && !belt) {
     if (p.getUp > 0) {
       // Tirado de espaldas: ahí sí hay fricción.
       p.vx = approach(p.vx, 0, TUNING.skidFriction * dt);
@@ -170,7 +222,12 @@ export function step(world: World, input: SimInput, dt: number): SimEvent[] {
   }
 
   resolveFloor(world, events);
-  if (world.outcome === null && !p.sinking) resolveRollers(world, events);
+  if (world.outcome === null && !p.sinking) {
+    resolveRollers(world, events);
+    resolveHammers(world, events);
+    resolveBalls(world, events);
+    resolvePompas(world, events);
+  }
   updateLean(p, dt);
 
   if (!p.sinking) {
@@ -226,6 +283,7 @@ function resolveFloor(world: World, events: SimEvent[]) {
   if (p.grounded) {
     if (overPuddle) p.grounded = false; // se le acabó el piso
     else p.y = floor;
+    if (p.grounded && trampolineAt(level, p.x)) launch(p, level, events);
     return;
   }
 
@@ -240,6 +298,11 @@ function resolveFloor(world: World, events: SimEvent[]) {
   // absorben el golpe; en ragdoll, el cuerpo rebota como goma.
   const impact = p.vy;
   p.y = floor;
+  p.launched = false;
+  if (trampolineAt(level, p.x)) {
+    launch(p, level, events);
+    return;
+  }
   p.leanVel += Math.sign(p.vx || 1) * impact * TUNING.landingWobble;
   events.push({ type: "land", impact });
   if (p.ragdoll && impact > TUNING.minBounceSpeed) {
@@ -260,30 +323,96 @@ function resolveRollers(world: World, events: SimEvent[]) {
 
   for (const roller of world.level.rollers) {
     const cy = rollerCenterY(world.level, roller, world.time);
-    const hit = circleIntersectsRect(
-      roller.x,
-      cy,
-      roller.radius,
-      p.x - HALF_WIDTH,
-      p.y - PLAYER_SIZE.height,
-      p.x + HALF_WIDTH,
-      p.y,
-    );
-    if (!hit) continue;
+    if (!circleIntersectsRect(roller.x, cy, roller.radius, ...playerRect(p))) continue;
 
     // Lo despide para el lado opuesto al rodillo: casi siempre, hacia atrás.
     const dir = p.x >= roller.x ? 1 : -1;
-    p.vx = dir * (TUNING.knockbackBase + Math.abs(p.vx) * TUNING.knockbackCarry);
-    p.vy = -TUNING.knockbackLift;
+    knock(p, dir * (TUNING.knockbackBase + Math.abs(p.vx) * TUNING.knockbackCarry), -TUNING.knockbackLift);
     p.x = roller.x + dir * (roller.radius + HALF_WIDTH + 1);
-    p.grounded = false;
-    p.leanVel = dir * TUNING.knockbackSpin;
-    p.ragdoll = true;
-    p.getUp = 0;
-    p.hitCooldown = TUNING.hitCooldown;
-    events.push({ type: "bonk", x: roller.x, y: cy });
+    events.push({ type: "bonk", x: roller.x, y: cy, by: "roller" });
     return;
   }
+}
+
+function launch(p: Player, level: Level, events: SimEvent[]) {
+  const pad = trampolineAt(level, p.x)!;
+  p.vy = -TUNING.trampolineSpeed;
+  // Hacia adelante y a una velocidad acotada: el vuelo siempre se parece.
+  p.vx = clamp(Math.abs(p.vx), TUNING.trampolineMinVx, TUNING.trampolineMaxVx);
+  p.grounded = false;
+  p.launched = true;
+  p.jumpBuffer = 0;
+  events.push({ type: "launch", x: (pad.x0 + pad.x1) / 2 });
+}
+
+/** Lo despide: sin control, girando, como en cualquier golpe. */
+function knock(p: Player, vx: number, vy: number) {
+  p.vx = vx;
+  p.vy = vy;
+  p.grounded = false;
+  p.leanVel = Math.sign(vx || 1) * TUNING.knockbackSpin;
+  p.ragdoll = true;
+  p.getUp = 0;
+  p.hitCooldown = TUNING.hitCooldown;
+}
+
+function resolveHammers(world: World, events: SimEvent[]) {
+  const p = world.player;
+  if (p.hitCooldown > 0) return;
+  for (const hammer of world.level.hammers) {
+    const head = hammerHead(world.level, hammer, world.time);
+    if (!circleIntersectsRect(head.x, head.y, hammer.radius, ...playerRect(p))) continue;
+    // Empuja para el lado al que va la cabeza: a veces te ayuda.
+    const dir = Math.abs(head.vx) > 60 ? Math.sign(head.vx) : Math.sign(p.x - head.x) || 1;
+    knock(p, dir * TUNING.hammerKnock, -TUNING.hammerLift);
+    events.push({ type: "bonk", x: head.x, y: head.y, by: "hammer" });
+    return;
+  }
+}
+
+function resolveBalls(world: World, events: SimEvent[]) {
+  const p = world.player;
+  if (p.hitCooldown > 0) return;
+  world.level.cannons.forEach((cannon, c) => {
+    if (p.hitCooldown > 0) return;
+    for (const ball of cannonBalls(world.level, cannon, world.time)) {
+      const key = `${c}:${ball.shot}`;
+      if (world.spentBalls.includes(key)) continue;
+      if (!circleIntersectsRect(ball.x, ball.y, BALL_RADIUS, ...playerRect(p))) continue;
+      world.spentBalls.push(key);
+      knock(p, -TUNING.ballKnock, -TUNING.ballLift);
+      events.push({ type: "bonk", x: ball.x, y: ball.y, by: "ball" });
+      return;
+    }
+  });
+}
+
+function resolvePompas(world: World, events: SimEvent[]) {
+  const p = world.player;
+  world.level.pompas.forEach((pompa, i) => {
+    if (world.pompas[i] || !circleIntersectsRect(pompa.x, pompa.y, POMPA_RADIUS, ...playerRect(p))) return;
+    world.pompas[i] = true;
+    events.push({ type: "pompa", x: pompa.x, y: pompa.y });
+  });
+}
+
+/** Avisos y disparos de los cañones (aunque estén lejos: el nivel es igual para todos). */
+function cannonEvents(world: World, dt: number, events: SimEvent[]) {
+  const prev = world.time - dt;
+  for (const cannon of world.level.cannons) {
+    const crossed = (t: number) => t > prev && t <= world.time;
+    const next = Math.floor((world.time + CANNON_WARNING - cannon.phase) / cannon.interval);
+    for (const shot of [next - 1, next]) {
+      if (shot < 0) continue;
+      const at = cannon.phase + shot * cannon.interval;
+      if (crossed(at - CANNON_WARNING)) events.push({ type: "aim", x: cannon.x });
+      if (crossed(at)) events.push({ type: "fire", x: cannon.x });
+    }
+  }
+}
+
+function playerRect(p: Player) {
+  return [p.x - HALF_WIDTH, p.y - PLAYER_SIZE.height, p.x + HALF_WIDTH, p.y] as const;
 }
 
 function updateLean(p: Player, dt: number) {
@@ -329,10 +458,10 @@ function end(world: World, outcome: Outcome) {
 export function liveScore(world: World): number {
   const { startX, finishX } = world.level;
   const progress = clamp((world.player.maxX - startX) / (finishX - startX), 0, 1);
-  return Math.round(SCORING.distancePoints * progress);
+  return Math.round(SCORING.distancePoints * progress) + pompaCount(world) * SCORING.pompaPoints;
 }
 
-/** Puntaje final: distancia + meta + bonus por tiempo sobrante. */
+/** Puntaje final: distancia + pompas + meta + bonus por tiempo sobrante. */
 export function finalScore(world: World): number {
   let score = liveScore(world);
   if (world.outcome === "finished" && world.endedAt !== null) {

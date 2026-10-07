@@ -213,13 +213,23 @@ sonido usa placeholders sintetizados hasta que lleguen los audios de Flow.
 |---|---|---|---|
 | 2.1 | Baldes al Tanque (simulación, nivel, render, tests, bot) | L | Hoja `props-baldes` (falta) |
 | 2.2 | El Tronco Loco ✅ | L | Hoja `props-tronco` |
-| 2.3 | Puente v2: trampolín, cinta, martillo, cañón, pompas, banderas | M | Hoja `props-puente-v2` (llegó; ya se usan las banderas) |
+| 2.3 | Puente v2: trampolín, cinta, martillo, cañón, pompas, banderas ✅ | M | Hoja `props-puente-v2` |
 
 **El Tronco Loco quedó así:** arranca quieto y el primer crujido enseña que cada
 cambio de giro se avisa un segundo antes. Los cañones están a dos alturas: la pelota
 baja se salta; la alta te pasa por arriba si no saltás. Bots calibrados (12
 partidas): as ≈ 820, promedio ≈ 700, torpe ≈ 380. Un jugador perfecto saca ≈ 985.
 Mientras falta Baldes al Tanque, el episodio es Puente → Tronco → Puente.
+
+**El Puente v2 quedó así** (8450 px, por bloques): charco chico con pompa encima →
+rodillo con pompa → trampolín que cruza un charco ancho (pompas en el arco) → cinta
+de goma → dos martillos con un charco en el medio → rodillo que sube y baja con
+pelotas de cañón cruzando → cadena de dos trampolines → cinta + martillo → último
+charco y meta. Reglas que fijan los tests: el trampolín vuela siempre entre ~480 y
+~600 px (aterriza en piso firme o en otro trampolín), nunca hay dos obstáculos que
+empujan a menos de un vuelo de distancia (evita el pinball), hay una bandera cada
+1600 px como mucho y las banderas están lejos de todo lo que empuja. Bots: as ≈ 805,
+promedio ≈ 540, torpe ≈ 390; un jugador que planifica saca ≈ 876 en 21 s.
 
 ### Fase 3 — "Personajes"
 
@@ -251,3 +261,37 @@ siguiente. Los prompts están en `docs/ART_DIRECTION.md`.
 | El arte de IA sale inconsistente | Siempre usar la hoja de referencia del personaje como imagen de inicio |
 | El nombre "Supermatch" | Consultarlo antes de un lanzamiento comercial |
 | Trampas en el ranking | Topes por prueba hoy; re-simulación del input en el servidor (4.5) |
+
+## 12. Por qué todavía se siente básico, y cómo seguir
+
+Diagnóstico después de la Fase 1, el Tronco y el Puente v2:
+
+| Qué falta | Por qué pesa | Cómo se resuelve |
+|---|---|---|
+| **Sonido de verdad** | Los efectos y la música son sintetizados: suenan a demo. Es lo que más "abarata" | Audios de Flow (prompts listos) + voces del presentador |
+| **Personaje con más vida** | El títere de cartón tiene pocas poses | Clips de video de Flow por estado (Fase 3.2), más expresiones, ropa que se mueve |
+| **Momentos para mostrar** | Lo más gracioso (una caída) pasa y se va | Repetición de la mejor caída en cámara lenta al final del episodio, para compartir |
+| **Motivo para volver** | Cada partida es igual | Episodio del día, récords personales, medallas por prueba, comodín ×2 |
+| **Variedad** | Dos pruebas | Baldes al Tanque y después Justa en la Pileta |
+
+### Hecho en la pasada de "juice" y show
+
+- Congelado de impacto en cada golpe y cámara lenta al caer al agua y al llegar.
+- Cámara que sigue en altura (trampolines), se aleja al volar y da un golpe de zoom en
+  los impactos; líneas de velocidad a fondo sobre el jabón.
+- Hinchada de los 4 equipos en primer plano que salta con cada caída; luces que
+  barren el estudio; cartel "EN VIVO".
+- Tu puesto en vivo ("2º") y avisos de adelantamiento ("¡PASASTE A AZUL!").
+- Brazos en molino al patinar sin control, festejo al ganar y reaparición cayendo
+  desde arriba de la bandera.
+
+### Orden propuesto
+
+1. **Audios de Flow** (efectos, música, voces del presentador): el mayor salto de
+   calidad por esfuerzo. Solo necesita los videos.
+2. **Repetición de la mejor caída** al final del episodio (la simulación es
+   determinista: se graba el input y se vuelve a jugar en cámara lenta). M.
+3. **Baldes al Tanque**, la tercera prueba. L.
+4. **Medallas y récords** (bronce, plata, oro por prueba) y episodio del día. M.
+5. **Clips del concursante** (correr, patinar, golpe, festejo) en lugar del títere. L.
+

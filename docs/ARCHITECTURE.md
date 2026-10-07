@@ -62,6 +62,8 @@ supermatch/
 │   │   │   ├── audio.ts              # Efectos, música en loop, silencio
 │   │   │   ├── animator.ts           # Animación de un concursante (cualquier prueba)
 │   │   │   ├── referee.ts            # El árbitro: silbato, tarjeta roja, bandera
+│   │   │   ├── show.ts               # Luces, hinchada, "EN VIVO", puesto y adelantamientos
+│   │   │   ├── timefx.ts             # Congelado de impacto y cámara lenta
 │   │   │   ├── random.ts             # Aleatorio con semilla (bots)
 │   │   │   ├── physics.ts            # Helpers puros: approach, spring, colisiones
 │   │   │   ├── contestant.ts         # Rig del concursante (títere de cartón)
@@ -172,6 +174,11 @@ Cada minijuego separa **qué pasa** de **cómo se ve**:
 Así el feel se puede testear sin navegador, el resultado no depende de los FPS del
 jugador y, más adelante, una partida se podría re-simular en el servidor a partir del
 input grabado.
+
+El congelado de impacto y la cámara lenta (`timefx.ts`) cambian cuánta simulación se
+avanza por frame, nunca la simulación: el resultado es el mismo. Los resortes visuales
+(`spring` en `physics.ts`) se subdividen en pasos de 1/60 s, así un frame lento no
+los hace explotar.
 
 Cada minijuego tiene además su `bot.ts` (los rivales, que corren la misma simulación)
 y su `tuning.ts` con `SERVER_LIMITS`, el espejo de su fila en `public.minigames`.

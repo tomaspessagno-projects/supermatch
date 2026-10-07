@@ -11,9 +11,14 @@ export function approach(value: number, target: number, maxDelta: number): numbe
     : Math.max(value - maxDelta, target);
 }
 
+/** Paso máximo del resorte: con pasos más largos, Euler semi-implícito explota. */
+const MAX_SPRING_STEP = 1 / 60;
+
 /**
  * Resorte amortiguado (Euler semi-implícito). Devuelve [valor, velocidad].
  * Con damping < 2·√stiffness oscila antes de asentarse: ese es el tambaleo.
+ * Si `dt` es largo (un frame lento) lo subdivide, así nunca se dispara; con
+ * el paso fijo de la simulación (1/120 s) da exactamente lo mismo.
  */
 export function spring(
   value: number,
@@ -23,9 +28,14 @@ export function spring(
   damping: number,
   dt: number,
 ): [number, number] {
-  const accel = -stiffness * (value - target) - damping * velocity;
-  const nextVelocity = velocity + accel * dt;
-  return [value + nextVelocity * dt, nextVelocity];
+  const steps = Math.max(1, Math.ceil(dt / MAX_SPRING_STEP));
+  const h = dt / steps;
+  for (let i = 0; i < steps; i++) {
+    const accel = -stiffness * (value - target) - damping * velocity;
+    velocity += accel * h;
+    value += velocity * h;
+  }
+  return [value, velocity];
 }
 
 /** Lleva un ángulo en grados a (-180, 180]. */

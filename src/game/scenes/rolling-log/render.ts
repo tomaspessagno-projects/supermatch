@@ -5,7 +5,8 @@ import { createContestant } from "../../engine/contestant";
 import { createFx } from "../../engine/fx";
 import { clamp } from "../../engine/physics";
 import { createReferee } from "../../engine/referee";
-import type { SimEvent, World } from "./sim";
+import { createRankTracker, createShow } from "../../engine/show";
+import { score, type SimEvent, type World } from "./sim";
 import { TUNING } from "./tuning";
 
 const VIEW_W = 1280;
@@ -33,7 +34,11 @@ type CannonKey = `${-1 | 1}:${"low" | "high"}`;
  * Dibuja El Tronco Loco a partir de la simulación. Cámara fija: el "nivel" es
  * lo que pasa en el tiempo (giro, disparos, burbujas). Nunca modifica `world`.
  */
-export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: readonly string[]) {
+export function createRenderer(
+  k: KAPLAYCtx,
+  teamColor: string,
+  rivalTeams: readonly { color: string; name: string }[],
+) {
   const c = {
     team: k.rgb(teamColor),
     ink: k.rgb("#1f1147"),
@@ -44,11 +49,14 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
     danger: k.rgb("#f87171"),
     deck: k.rgb("#e0f2fe"),
     pole: k.rgb("#3b2a6b"),
+    good: k.rgb("#4ade80"),
   };
   const fx = createFx(k, FONT);
   const referee = createReferee(k);
+  const show = createShow(k, [teamColor, ...rivalTeams.map((r) => r.color)]);
+  const ranking = createRankTracker(rivalTeams.map((r) => r.name.toUpperCase()));
   const player = { look: createContestant(k, teamColor), anim: createAnimator() };
-  const rivals = rivalColors.map((color, i) => ({
+  const rivals = rivalTeams.map(({ color }, i) => ({
     color: k.rgb(color),
     look: createContestant(k, color),
     anim: createAnimator(),
@@ -61,6 +69,8 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
   let creakDir = 0;
   let bannerAge = 0;
   let time = 0;
+  let rank = 1;
+  let callout: { text: string; good: boolean; age: number } | null = null;
 
   function react(events: readonly SimEvent[], world: World) {
     const p = world.player;
@@ -93,10 +103,12 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
           fx.burst({ x: e.x, y: e.y, count: 10, speed: 520, sprites: ["fx-star"], size: 22, spread: 360 });
           fx.popup("¡PUM!", e.x, e.y - 90, c.star, { size: 48, backdrop: "fx-burst", backdropSize: 180 });
           k.shake(12);
+          show.excite(0.45);
           break;
         case "pop":
           fx.burst({ x: e.x, y: e.y, count: 12, speed: 320, sprites: CONFETTI, size: 12, spread: 360, life: 0.8, gravity: 400 });
           fx.popup("+25", e.x, e.y - 40, c.star, { size: 34 });
+          show.excite(0.2);
           break;
         case "slip":
           fx.popup("¡UY!", e.x, p.y - 140, c.white, { size: 40 });
@@ -107,12 +119,14 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
           fx.burst({ x: e.x, y: waterY, count: 24, speed: 700, colors: [c.water, c.white], size: 14, spread: 70, life: 0.9 });
           fx.popup("¡PLAF!", e.x, waterY - 150, c.water, { size: 56 });
           k.shake(8);
+          show.excite(0.9);
           break;
         case "respawn":
           fx.flash("fx-puff", e.x, center.y - radius + 4, { anchor: "bot", from: 0.2, to: 0.5, life: 0.5 });
           break;
         case "finish":
           referee.end();
+          show.excite(1);
           fx.burst({ x: p.x, y: p.y - 120, count: 60, speed: 650, sprites: CONFETTI, size: 18, spread: 150, life: 1.8, gravity: 500 });
           break;
         case "out":
@@ -142,6 +156,7 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
     time += dt;
     fx.update(dt);
     referee.update(dt);
+    show.update(dt);
     const carried = world.player.grounded ? world.omega * world.level.radius : 0;
     player.anim.update(dt, world.player, move, world.player.vx - carried);
     rivalWorlds.forEach((w, i) => {
@@ -151,11 +166,21 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
     for (const [key, r] of recoil) recoil.set(key, Math.max(0, r - dt * 5));
     k.setCamPos(VIEW_W / 2, VIEW_H / 2);
     k.setCamScale(1);
+
+    // Puesto por puntaje y avisos de adelantamiento.
+    const race = ranking.update(score(world), rivalWorlds.map(score), world.time);
+    rank = race.rank;
+    if (race.calls.length && world.outcome === null) callout = { ...race.calls[race.calls.length - 1], age: 0 };
+    if (callout) {
+      callout.age += dt;
+      if (callout.age > 1.8) callout = null;
+    }
     bannerAge = world.outcome ? bannerAge + dt : 0;
   }
 
   function draw(world: World, rivalWorlds: readonly World[]) {
     drawStudio();
+    show.drawLights();
     rivalWorlds.forEach((w, i) => drawRival(i, w));
     drawWater(world, 1);
     drawDuck(world);
@@ -169,6 +194,7 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
     drawBubbles(world);
     referee.draw(POOLSIDE_W / 2, world.level.waterY - 10, 92);
     fx.draw();
+    show.drawCrowd(0);
     drawOverlay(world);
   }
 
@@ -237,7 +263,7 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
 
   function drawPlayer(world: World) {
     if (world.respawnIn > 0) return;
-    player.look.draw(player.anim.pose(world.player, world.time));
+    player.look.draw(player.anim.pose(world.player, world.time, { celebrate: world.outcome === "finished" }));
   }
 
   /** Borde de la pileta: el mismo tablón enjabonado del Puente. */
@@ -343,8 +369,23 @@ export function createRenderer(k: KAPLAYCtx, teamColor: string, rivalColors: rea
   }
 
   function drawOverlay(world: World) {
+    show.drawLiveBadge(FONT);
+    show.drawRank(rank, VIEW_W / 2 - 92, 62, FONT, { gold: c.star, plain: c.white });
     const timeLeft = Math.max(0, TUNING.timeLimit - world.time);
     k.drawText({ text: String(Math.ceil(timeLeft)), pos: k.vec2(VIEW_W / 2, 60), size: 40, font: FONT, anchor: "center", color: timeLeft < 10 ? c.danger : c.white });
+    if (callout) {
+      const pop = 1 + 0.4 * Math.max(0, 1 - callout.age * 5);
+      k.drawText({
+        text: callout.text,
+        pos: k.vec2(VIEW_W / 2, 160),
+        size: 32,
+        font: FONT,
+        anchor: "center",
+        scale: pop,
+        color: callout.good ? c.good : c.danger,
+        opacity: Math.min(1, (1.8 - callout.age) * 3),
+      });
+    }
 
     // Vidas: cabecitas; las perdidas, apagadas.
     for (let life = 0; life < TUNING.lives; life++) {
