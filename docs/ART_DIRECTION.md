@@ -121,6 +121,118 @@ Isolated on a perfectly flat pure magenta (#FF00FF) background, nothing touching
 Variante con mascotas: reemplazar "a white star and a lightning bolt" por
 "a cartoon mascot: a bull (red), a shark (blue), a bee (yellow), a frog (green)".
 
+
+## Animaciones con video (Google Flow / Veo)
+
+Los modelos de video mantienen al personaje igual de un cuadro a otro, algo que los
+de imagen no logran. De cada clip se extraen cuadros a 12 por segundo (animación "en
+dos", estilo dibujo animado), se saca el verde, se fija el personaje por los pies y la
+camiseta se separa para teñirla por equipo. El juego elige el clip según el estado de
+la física (corre, patina, vuela, golpe, se levanta, cae al agua, festeja) y la
+inclinación del ragdoll se sigue aplicando encima. El audio de los clips se usa como
+efectos de sonido.
+
+**En Flow:** modo *Frames to Video*, 16:9, 8 segundos, el modelo Veo de mejor calidad.
+Como cuadro de inicio usá `art/flow/inicio-perfil.png` (o `inicio-frente.png` donde se
+indica). En los clips que dicen **loop**, si Flow permite cuadro final, usá el mismo
+cuadro de inicio: así el ciclo cierra perfecto. Si genera audio, dejalo.
+
+**Entrega:** los `.mp4` van en `art/source/clips/` con el nombre de cada clip.
+
+### Personaje (cuadro de inicio: `inicio-perfil.png`)
+
+#### correr.mp4 (loop)
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D, not realistic). Keep the exact same character, proportions and plain white clothes. Side view, the character faces RIGHT the whole time. Static locked-off camera: no zoom, no pan, no camera movement. The character stays in the same spot, full body always inside the frame with margin. The background stays flat pure green (#00FF00) for the whole video: no floor, no shadows, no props, no text. Cartoon sound effects only, no music, no dialogue.
+Action: The character runs IN PLACE on a slippery soapy floor: legs pedal super fast like an old cartoon, arms pump, body leans forward with a goofy determined face and small wobbles. A repeating run cycle that loops seamlessly.
+```
+
+#### patinar.mp4 (loop)
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D, not realistic). Keep the exact same character, proportions and plain white clothes. Side view, the character faces RIGHT the whole time. Static locked-off camera: no zoom, no pan, no camera movement. The character stays in the same spot, full body always inside the frame with margin. The background stays flat pure green (#00FF00) for the whole video: no floor, no shadows, no props, no text. Cartoon sound effects only, no music, no dialogue.
+Action: The character stands on an extremely slippery floor and struggles to keep its balance: feet slide back and forth, arms windmill wildly, the body tips backward and forward, panicked face. Loops seamlessly.
+```
+
+#### salto.mp4 (una vez)
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D, not realistic). Keep the exact same character, proportions and plain white clothes. Side view, the character faces RIGHT the whole time. Static locked-off camera: no zoom, no pan, no camera movement. The character stays in the same spot, full body always inside the frame with margin. The background stays flat pure green (#00FF00) for the whole video: no floor, no shadows, no props, no text. Cartoon sound effects only, no music, no dialogue.
+Action: The character crouches, jumps straight up high with arms raised, flails in the air with a surprised face, and lands back on the same spot with a wobbly knee bend.
+```
+
+#### golpe.mp4 (una vez)
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D, not realistic). Keep the exact same character, proportions and plain white clothes. Side view, the character faces RIGHT the whole time. Static locked-off camera: no zoom, no pan, no camera movement. The character stays in the same spot, full body always inside the frame with margin. The background stays flat pure green (#00FF00) for the whole video: no floor, no shadows, no props, no text. Cartoon sound effects only, no music, no dialogue.
+Action: The character gets hit by something coming from the right and turns into a limp ragdoll: it tumbles and spins in place in mid-air with floppy arms and legs, dizzy spiral eyes and little stars around the head.
+```
+
+#### levantarse.mp4 (una vez)
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D, not realistic). Keep the exact same character, proportions and plain white clothes. Side view, the character faces RIGHT the whole time. Static locked-off camera: no zoom, no pan, no camera movement. The character stays in the same spot, full body always inside the frame with margin. The background stays flat pure green (#00FF00) for the whole video: no floor, no shadows, no props, no text. Cartoon sound effects only, no music, no dialogue.
+Action: The character lies flat on its back at the bottom of the frame, dizzy with spiral eyes, then clumsily gets up, shakes its head and recovers its balance.
+```
+
+#### caer-agua.mp4 (una vez)
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D, not realistic). Keep the exact same character, proportions and plain white clothes. Side view, the character faces RIGHT the whole time. Static locked-off camera: no zoom, no pan, no camera movement. The character stays in the same spot, full body always inside the frame with margin. The background stays flat pure green (#00FF00) for the whole video: no floor, no shadows, no props, no text. Cartoon sound effects only, no music, no dialogue.
+Action: The floor vanishes: the character hangs in the air for a moment like in old cartoons, looks down, panics and screams, then drops straight down out of the bottom of the frame.
+```
+
+#### festejo.mp4 (loop)
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D, not realistic). Keep the exact same character, proportions and plain white clothes. Side view, the character faces RIGHT the whole time. Static locked-off camera: no zoom, no pan, no camera movement. The character stays in the same spot, full body always inside the frame with margin. The background stays flat pure green (#00FF00) for the whole video: no floor, no shadows, no props, no text. Cartoon sound effects only, no music, no dialogue.
+Action: The character celebrates winning: hops with joy, pumps its fists, big open-mouth smile, a silly happy dance. Loops seamlessly.
+```
+
+### Portada (cuadro de inicio: `inicio-frente.png`)
+
+#### saludo.mp4 (loop)
+
+```
+2D hand-drawn cartoon animation in exactly the same style as the start frame (thick dark-purple outlines, flat colors, simple cel shading; not 3D). Keep the exact same character and plain white clothes. Front view facing the camera. Static locked-off camera, no zoom or pan. The character stays in the same spot, full body always inside the frame. Flat pure green (#00FF00) background for the whole video, no floor, no shadows, no text. No music, no dialogue.
+Action: the character waves at the viewer with one gloved hand, bounces happily on its feet and blinks. Loops seamlessly.
+```
+
+### Efectos (sin cuadro de inicio: *Text to Video*)
+
+#### salpicon.mp4
+
+```
+2D cartoon visual effect animation. Static locked-off camera. Flat pure green (#00FF00) background for the whole video, no text, no other objects. A cartoon water splash erupts upward from the bottom center of the frame and falls back down: cyan (#22D3EE) water with white foam and droplets, thick dark-purple outlines, flat colors, side view. It ends with the frame empty. A splash sound effect.
+```
+
+#### impacto.mp4
+
+```
+2D cartoon visual effect animation. Static locked-off camera. Flat pure green (#00FF00) background for the whole video, no text, no other objects. A yellow comic-book impact starburst pops out from the center with small yellow stars flying outward, then shrinks and disappears. Thick dark-purple outlines, flat colors. A rubbery cartoon 'boing' sound effect.
+```
+
+#### espuma.mp4
+
+```
+2D cartoon visual effect animation. Static locked-off camera. Flat pure green (#00FF00) background for the whole video, no text, no other objects. A puff of white soap foam and bubbles bursts out from the bottom center and quickly dissipates. Thick dark-purple outlines, flat colors. A soft cartoon 'poof' sound effect.
+```
+
+#### confeti.mp4
+
+```
+2D cartoon visual effect animation. Static locked-off camera. Flat pure green (#00FF00) background for the whole video, no text, no other objects. A burst of confetti (pink, yellow, cyan and white pieces, nothing green) shoots up from the bottom center and rains down until the frame is empty. Thick outlines, flat colors. A party horn and a short crowd cheer.
+```
+
+### Ambiente (cuadro de inicio: `art/source/fondo-estudio.jpg`)
+
+#### estudio.mp4 (loop)
+
+```
+Animate this exact 2D cartoon TV studio background without changing its framing or style. Static locked-off camera: no zoom, no pan. The colored spotlights slowly sweep left and right, the crowd silhouettes cheer and wave their arms, confetti falls gently and the giant screens shimmer. The bottom third stays dark and empty. Seamless loop. Crowd cheering ambience sound, no music.
+```
+
 ## Pipeline
 
 Las hojas originales viven en `art/source/` con el nombre de cada prompt
