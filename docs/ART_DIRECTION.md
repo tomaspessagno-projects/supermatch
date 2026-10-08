@@ -66,8 +66,8 @@ muñeco procedural con `useGLTF` + `useAnimations` de drei.
 
 ## Minijuegos 2D (archivado)
 
-Lo que sigue es la dirección de arte de los minijuegos 2D, que quedaron en el tag
-`minijuegos-2d`. Sirve como referencia de estilo; los sprites siguen en `public/`.
+Lo que sigue es la dirección de arte de los minijuegos 2D, que quedaron en el commit
+`a4b0b9c`. Sirve como referencia de estilo; los sprites siguen en `public/`.
 
 ### Estilo 2D
 

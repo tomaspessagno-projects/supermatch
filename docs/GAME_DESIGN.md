@@ -5,7 +5,7 @@
 > mejorás al concursante en el kiosco y volvés a subir más alto.
 
 La versión anterior (minijuegos 2D: El Puente Resbaladizo, El Tronco Loco, El Colchón y
-las carreras online) quedó archivada en el tag de git **`minijuegos-2d`**, con su diseño
+las carreras online) quedó archivada en el commit **`a4b0b9c`** (tag local `minijuegos-2d`), con su diseño
 completo en ese mismo archivo.
 
 ## 1. Pilares

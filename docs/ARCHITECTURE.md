@@ -1,7 +1,8 @@
 # Arquitectura
 
-La versión 2D anterior (KAPLAY, rollback, carreras online) está en el tag
-**`minijuegos-2d`**, con su arquitectura documentada en ese mismo archivo.
+La versión 2D anterior (KAPLAY, rollback, carreras online) está en el commit
+**`a4b0b9c`** (tag local `minijuegos-2d`), con su arquitectura documentada en ese mismo
+archivo.
 
 ## Decisiones
 

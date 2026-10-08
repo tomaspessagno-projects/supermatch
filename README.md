@@ -8,7 +8,7 @@ rarezas y mutaciones, y La Copa arriba de todo. Elegís facción (Rojo, Azul, Am
 Verde) para siempre.
 
 Los minijuegos 2D anteriores (El Puente Resbaladizo, El Tronco Loco, El Colchón y las
-carreras online) están archivados en el tag `minijuegos-2d`.
+carreras online) están archivados en el commit `a4b0b9c` (tag local `minijuegos-2d`).
 
 **Stack:** Next.js 16 (App Router) + React 19 + TailwindCSS 4 · three.js + React Three
 Fiber + drei · Zustand · Supabase
