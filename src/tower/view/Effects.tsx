@@ -5,13 +5,23 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { itemDef, MUTATION } from "../sim/items";
+import type { TrailId } from "../sim/cosmetics";
 import type { HazardKind, SimEvent } from "../sim/sim";
+import { useTower } from "../store";
 import { TUNING } from "../sim/tuning";
 import { bus } from "./bus";
 import type { Frame } from "./frame";
 import { INK, PALETTE } from "./toon";
 
 const FONT = "/game/fonts/LuckiestGuy-Regular.ttf";
+
+/** Cómo es cada estela. */
+const TRAILS: Record<TrailId, { colors: string[]; size: number; up: number; gravity: number; life: number }> = {
+  bubbles: { colors: ["#bae6fd", "#e0f2fe", "#ffffff"], size: 0.09, up: 1.2, gravity: -0.5, life: 0.9 },
+  stars: { colors: ["#fde047", "#facc15", "#ffffff"], size: 0.07, up: 0.4, gravity: 0, life: 0.6 },
+  confetti: { colors: ["#f472b6", "#22d3ee", "#facc15", "#4ade80", "#a855f7"], size: 0.07, up: 1.5, gravity: 6, life: 0.8 },
+  rainbow: { colors: ["#ffffff"], size: 0.1, up: 0.2, gravity: 0, life: 0.7 },
+};
 
 /** El cartel de cada golpe (solo letras que tiene la fuente). */
 const KNOCK_TEXT: Record<HazardKind, string> = { sweeper: "¡PUM!", hammer: "¡TOING!", piston: "¡PIÑA!", cannon: "¡PAF!" };
@@ -63,6 +73,10 @@ export function Effects({ frame }: { frame: React.RefObject<Frame | null> }) {
           case "splash":
             burst(e.x, TUNING.waterY + 0.1, e.z, 70, [PALETTE.water, "#ffffff", "#7dd3fc"], 6, 9, 20, 0.16, 1.1);
             pop("¡PLAF!", PALETTE.cyan, e.x, TUNING.waterY + 3, e.z, 1.1);
+            break;
+          case "star":
+            burst(e.x, e.y, e.z, 60, [PALETTE.gold, "#fff7ae", "#ffffff"], 5, 6, 6, 0.12, 1.4);
+            pop("¡ESTRELLA DORADA!", PALETTE.gold, e.x, e.y + 1, e.z, 0.6);
             break;
           case "chip":
             burst(e.x, e.y, e.z, 10, [PALETTE.gold, "#fff7ae"], 2.5, 4, 10, 0.08, 0.6);
@@ -122,11 +136,38 @@ export function Effects({ frame }: { frame: React.RefObject<Frame | null> }) {
     });
   }, [frame]);
 
+  // Estela (cosmético): va soltando partículas mientras te movés.
+  const trail = useTower((s) => s.trail);
+  const trailClock = useRef(0);
+
   useFrame((_, delta) => {
     const m = mesh.current;
     if (!m) return;
     const dt = Math.min(delta, 0.05);
     const list = particles.current;
+    const f = frame.current;
+    const p = f?.world.player;
+    if (trail && f && p && f.world.phase === "playing" && (Math.abs(p.vx) + Math.abs(p.vz) > 1 || !p.grounded)) {
+      trailClock.current += dt;
+      while (trailClock.current > 0.035 && list.length < MAX_PARTICLES) {
+        trailClock.current -= 0.035;
+        const style = TRAILS[trail];
+        const color = trail === "rainbow" ? new THREE.Color().setHSL((f.clock * 0.6) % 1, 0.9, 0.6) : new THREE.Color(style.colors[Math.floor(Math.random() * style.colors.length)]);
+        list.push({
+          x: p.x + (Math.random() - 0.5) * 0.3,
+          y: p.y + 0.3 + Math.random() * 0.6,
+          z: p.z + (Math.random() - 0.5) * 0.3,
+          vx: (Math.random() - 0.5) * 0.6,
+          vy: style.up,
+          vz: (Math.random() - 0.5) * 0.6,
+          life: style.life,
+          max: style.life,
+          size: style.size * (0.7 + Math.random() * 0.6),
+          color,
+          gravity: style.gravity,
+        });
+      }
+    }
     const mat = new THREE.Matrix4();
     let n = 0;
     for (let i = list.length - 1; i >= 0; i--) {

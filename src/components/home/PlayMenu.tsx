@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { TeamPicker } from "@/components/TeamPicker";
 import { getTeam } from "@/lib/teams";
 import { useSession } from "@/store/session";
+import { MAIN_QUEST } from "@/tower/sim/goals";
 import { useTower } from "@/tower/store";
 
 /** Portada: primero el equipo (para siempre) y después, a la torre. */
@@ -17,6 +18,9 @@ export function PlayMenu() {
   const record = useTower((s) => s.record);
   const fame = useTower((s) => s.fame);
   const runs = useTower((s) => s.runs);
+  const quest = useTower((s) => s.quest);
+  const stars = useTower((s) => s.stars.length);
+  const title = useTower((s) => s.title);
 
   useEffect(() => {
     void loadProfile();
@@ -42,6 +46,14 @@ export function PlayMenu() {
           por el <strong className="font-display text-lg text-white">{name}</strong>
         </p>
       </div>
+      {MAIN_QUEST[quest] && (
+        <div className="rounded-2xl border-4 border-ink bg-ink/60 px-4 py-2 text-sm" data-testid="home-mission">
+          <p className="font-display text-xs text-sun">
+            🎯 TU MISIÓN ({quest + 1}/{MAIN_QUEST.length}) · {title.toUpperCase()} · ★ {stars}/24
+          </p>
+          <p className="font-display text-white">{MAIN_QUEST[quest].text}</p>
+        </div>
+      )}
       <Link href="/torre" data-testid="play-tower" className="btn-chunky flex flex-col items-start bg-sun px-5 py-4 text-left text-ink">
         <span className="font-display text-3xl">{runs > 0 ? "¡VOLVER A LA TORRE!" : "¡A LA TORRE!"}</span>
         <span className="text-sm opacity-80">

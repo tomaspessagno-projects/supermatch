@@ -114,6 +114,8 @@ export type Progress = {
   record: number;
   /** Último descanso al que llegaste (índice de piso, -1 = ninguno). */
   highestRest: number;
+  /** Estrellas doradas ya encontradas (ids). */
+  stars?: number[];
 };
 
 /** Plataformas que se desinflan: cuándo las pisaron y hasta cuándo están desinfladas. */
@@ -147,6 +149,7 @@ export type SimEvent =
   | { type: "mantle" }
   | { type: "lift" }
   | { type: "chip"; value: number; x: number; y: number; z: number }
+  | { type: "star"; id: number; floor: number; x: number; y: number; z: number }
   | { type: "item"; item: Item; x: number; y: number; z: number }
   | { type: "bagFull"; x: number; y: number; z: number }
   | { type: "exhausted" }
@@ -183,7 +186,7 @@ export function createWorld(tower: Tower, stats: Stats, progress: Progress, seed
   return {
     tower,
     stats,
-    progress: { ...progress },
+    progress: { ...progress, stars: [...(progress.stars ?? [])] },
     seed,
     time: 0,
     phase: "playing",
@@ -629,6 +632,17 @@ function pickUp(w: World, events: SimEvent[]) {
   const p = w.player;
   const radius = w.stats.pickRadius;
   const cy = p.y + 0.8;
+  // Estrellas doradas: se cuentan al tocarlas (quedan para siempre).
+  const found = (w.progress.stars ??= []);
+  for (const star of w.tower.stars) {
+    if (found.includes(star.id)) continue;
+    const dx = star.x - p.x;
+    const dy = star.y - cy;
+    const dz = star.z - p.z;
+    if (dx * dx + dy * dy + dz * dz > (radius + 0.4) * (radius + 0.4)) continue;
+    found.push(star.id);
+    events.push({ type: "star", id: star.id, floor: star.floor, x: star.x, y: star.y, z: star.z });
+  }
   for (const spot of w.tower.spots) {
     const content = w.run.contents[spot.id];
     if (!content) continue;

@@ -6,8 +6,10 @@ que podés, te caés al agua, cobrás la fama de lo que subiste y juntaste, mejo
 concursante en el kiosco y volvés a subir más alto. Ocho pisos con sus cosas (jabón y
 cintas, camas elásticas, bolas rojas, martillos y guantes, redes y cañones, géiseres,
 nubes y calesitas), objetos con rarezas y mutaciones, mascotas, temporadas, eventos en
-vivo cada 5 minutos y La Copa arriba de todo. Elegís facción (Rojo, Azul, Amarillo o
-Verde) para siempre.
+vivo cada 5 minutos y La Copa arriba de todo. Siempre hay un objetivo a la vista: la
+misión del programa (en cadena), tres misiones del día, 24 estrellas doradas escondidas
+y cosméticos para ganar. Elegís facción (Rojo, Azul, Amarillo o Verde) para siempre, y
+cada metro que subís suma para tu equipo.
 
 Los minijuegos 2D anteriores (El Puente Resbaladizo, El Tronco Loco, El Colchón y las
 carreras online) están archivados en el commit `a4b0b9c` (tag local `minijuegos-2d`).

@@ -40,7 +40,7 @@ export function MissionBoard({ compact = false }: { compact?: boolean }) {
       <div className="text-center">
         <h2 className="text-cartoon text-2xl text-sun">MISIÓN DE HOY</h2>
         <p className="text-sm text-foreground/80">
-          Entre todos los de tu color, sumen {target.toLocaleString("es-AR")} puntos.
+          Entre todos los de tu color, sumen {target.toLocaleString("es-AR")} puntos: cada metro que subís en La Torre vale 10.
         </p>
       </div>
       <div className="grid grid-cols-4 gap-3">

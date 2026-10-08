@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { calmTower } from "./autopilot";
 import { makeItem } from "./items";
 import { type Block, type BlockKind, blinkOn, buildTower, cannonBall, centerOf, geyserOn, type Mover, moverBox, type Tower, windBlowing } from "./level";
 import { jumpHeight, NO_UPGRADES, statsFor, type Stats } from "./progression";
@@ -239,6 +240,57 @@ describe("La Torre: moverse", () => {
     expect(w.player.vz).toBeGreaterThan(3);
     run(w, 0.2, () => hold(0, -1));
     expect(w.player.climbing).toBe(false);
+  });
+});
+
+describe("La Torre: estrellas doradas", () => {
+  // Sin martillos ni cañones: acá se mide si se llega, no si te tiran.
+  const calm = calmTower(tower);
+  const world = (stats: Stats = base) => createWorld(calm, stats, { record: 0, highestRest: -1 });
+  const sameSpot = (b: Block, x: number, z: number) => Math.abs((b.minX + b.maxX) / 2 - x) < 0.01 && Math.abs((b.minZ + b.maxZ) / 2 - z) < 0.01;
+  /** Plataforma justo abajo de la estrella. */
+  const baseOf = (star: (typeof tower.stars)[number]) =>
+    tower.blocks.filter((b) => b.maxY < star.y && sameSpot(b, star.x, star.z)).sort((a, b) => b.maxY - a.maxY)[0];
+  const got = (events: SimEvent[], id: number) => events.some((e) => e.type === "star" && e.id === id);
+
+  it("las de arriba (y las de las cornisas) se agarran saltando desde abajo", () => {
+    for (const star of tower.stars.filter((s) => s.kind === "high" || (s.kind === "skill" && baseOf(s)?.kind !== "trampoline"))) {
+      const w = world();
+      standOn(w, baseOf(star));
+      expect(got(run(w, 1, (x) => press(x.time < DT * 1.5)), star.id), `estrella ${star.id}`).toBe(true);
+      expect(w.progress.stars).toContain(star.id);
+    }
+  });
+
+  it("las de la cama elástica, solo con súper rebote", () => {
+    const skill = tower.stars.filter((s) => s.kind === "skill" && baseOf(s)?.kind === "trampoline");
+    expect(skill.length).toBeGreaterThan(0);
+    for (const star of skill) {
+      const plain = world();
+      dropOn(plain, baseOf(star), 0.5);
+      expect(got(run(plain, 2), star.id)).toBe(false);
+      const timed = world();
+      dropOn(timed, baseOf(star), 0.5);
+      expect(got(run(timed, 2, (x) => press(x.player.vy < 0 && x.player.y < baseOf(star).maxY + 0.4)), star.id), `estrella ${star.id}`).toBe(true);
+    }
+  });
+
+  it("las de afuera se agarran tirándose hacia la pileta (y quedan aunque caigas)", () => {
+    for (const star of tower.stars.filter((s) => s.kind === "out")) {
+      const base = tower.blocks.find((b) => Math.abs(b.maxZ + 1.8 - star.z) < 0.01 && Math.abs((b.minX + b.maxX) / 2 - star.x) < 0.01 && Math.abs(b.maxY + 1.2 - star.y) < 0.01)!;
+      const w = world();
+      standOn(w, base);
+      const events = run(w, 3, (x) => hold(0, 1, x.player.grounded && x.player.z > base.maxZ - 0.5), (e) => e.some((x) => x.type === "splash"));
+      expect(got(events, star.id), `estrella ${star.id}`).toBe(true);
+      expect(w.progress.stars).toContain(star.id);
+    }
+  });
+
+  it("una estrella encontrada no se vuelve a contar", () => {
+    const star = tower.stars[0];
+    const w = createWorld(calm, base, { record: 0, highestRest: -1, stars: [star.id] });
+    standOn(w, baseOf(star));
+    expect(got(run(w, 1, (x) => press(x.time < DT * 1.5)), star.id)).toBe(false);
   });
 });
 

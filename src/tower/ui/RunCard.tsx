@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { itemDef, MUTATION, RARITY_LABEL } from "../sim/items";
+import { getTeam } from "@/lib/teams";
+import { useSession } from "@/store/session";
 import { useTower } from "../store";
 import { bus } from "../view/bus";
 
@@ -16,6 +18,8 @@ const RARITY_TEXT: Record<string, string> = {
 /** Lo que cobraste en el intento: aparece al caer a la pileta. */
 export function RunCard() {
   const run = useTower((s) => s.lastRun);
+  const teamPoints = useTower((s) => s.teamPoints);
+  const team = useSession((s) => s.team);
   const dismiss = useTower((s) => s.dismissRun);
   const openPanel = useTower((s) => s.openPanel);
 
@@ -78,6 +82,11 @@ export function RunCard() {
         <span className="text-cartoon text-xl text-white">TOTAL</span>
         <span className="text-cartoon text-3xl text-sun" data-testid="run-total">+{run.total}</span>
       </p>
+      {teamPoints !== null && teamPoints > 0 && team && (
+        <p className="mt-1 text-center font-display text-sm" style={{ color: getTeam(team).color }} data-testid="team-points">
+          +{teamPoints.toLocaleString("es-AR")} puntos para el {getTeam(team).name}
+        </p>
+      )}
       <div className="mt-3 flex gap-2">
         <button type="button" onClick={() => { dismiss(); openPanel("shop"); }} className="btn-chunky flex-1 bg-sun py-2 font-display text-lg text-ink">
           🛒 KIOSCO

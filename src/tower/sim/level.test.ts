@@ -110,6 +110,15 @@ describe("la torre", () => {
     expect([...moversOn(7)]).toContain("cloud");
   });
 
+  it("24 estrellas escondidas: tres por piso, ninguna adentro de un bloque", () => {
+    expect(tower.stars).toHaveLength(tower.floors.length * 3);
+    for (const f of tower.floors) expect(tower.stars.filter((s) => s.floor === f.index).map((s) => s.kind)).toEqual(["high", "out", "skill"]);
+    for (const star of tower.stars) {
+      const inside = tower.blocks.filter((b) => star.x > b.minX - 0.5 && star.x < b.maxX + 0.5 && star.y > b.minY - 0.5 && star.y < b.maxY + 0.5 && star.z > b.minZ - 0.5 && star.z < b.maxZ + 0.5);
+      expect(inside, `estrella ${star.id}`).toEqual([]);
+    }
+  });
+
   it("cada red está en la cara de adelante de su columna", () => {
     for (const net of tower.nets) {
       const pillar = blockOf(tower, net.pillar)!;

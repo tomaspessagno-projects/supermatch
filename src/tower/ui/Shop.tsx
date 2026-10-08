@@ -1,26 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import { COSMETICS, type CosmeticId } from "../sim/cosmetics";
+import { MAIN_QUEST, STAR_REWARDS } from "../sim/goals";
 import { PETS, SEASON_BONUS, seasonMultiplier, upgradeCost, UPGRADES } from "../sim/progression";
 import { type Panel, useTower } from "../store";
 import { play } from "../view/sfx";
 
-const TABS: { id: Exclude<Panel, "collection" | null>; label: string }[] = [
+type Tab = "shop" | "pets" | "closet" | "season";
+
+const TABS: { id: Tab; label: string }[] = [
   { id: "shop", label: "MEJORAS" },
   { id: "pets", label: "MASCOTAS" },
+  { id: "closet", label: "VESTUARIO" },
   { id: "season", label: "TEMPORADA" },
 ];
+
+const isTab = (p: Panel): p is Tab => TABS.some((t) => t.id === p);
 
 /** El kiosco del programa: mejoras, mascotas y la temporada nueva. */
 export function Shop() {
   const fame = useTower((s) => s.fame);
   const panel = useTower((s) => s.panel);
   const open = useTower((s) => s.openPanel);
-  const tab = panel === "pets" || panel === "season" ? panel : "shop";
+  const tab: Tab = isTab(panel) ? panel : "shop";
 
   return (
     <Modal title="KIOSCO" subtitle={`Tenés ⭐ ${Math.floor(fame).toLocaleString("es-AR")} de fama`} onClose={() => open(null)} testId="shop">
-      <div className="grid grid-cols-3 gap-1 rounded-2xl border-4 border-ink bg-ink/60 p-1" role="tablist">
+      <div className="grid grid-cols-4 gap-1 rounded-2xl border-4 border-ink bg-ink/60 p-1" role="tablist">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -29,7 +36,7 @@ export function Shop() {
             aria-selected={tab === t.id}
             data-testid={`tab-${t.id}`}
             onClick={() => open(t.id)}
-            className={`rounded-xl px-2 py-1.5 font-display text-sm transition sm:text-base ${tab === t.id ? "bg-sun text-ink" : "text-foreground/70 hover:bg-white/10"}`}
+            className={`rounded-xl px-1 py-1.5 font-display text-[11px] transition sm:text-base ${tab === t.id ? "bg-sun text-ink" : "text-foreground/70 hover:bg-white/10"}`}
           >
             {t.label}
           </button>
@@ -37,6 +44,7 @@ export function Shop() {
       </div>
       {tab === "shop" && <Upgrades />}
       {tab === "pets" && <Pets />}
+      {tab === "closet" && <Closet />}
       {tab === "season" && <Season />}
     </Modal>
   );
@@ -117,6 +125,50 @@ function Pets() {
                   className="btn-chunky shrink-0 bg-sun px-3 py-1.5 font-display text-ink disabled:bg-white/10 disabled:text-foreground/50"
                 >
                   ⭐ {p.price.toLocaleString("es-AR")}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+/** Cómo se gana cada cosmético (para los que todavía no tenés). */
+function howToGet(id: CosmeticId): string {
+  const quest = MAIN_QUEST.find((m) => m.reward.cosmetic === id);
+  if (quest) return `Misión: ${quest.text}`;
+  const stars = STAR_REWARDS.find((r) => r.reward.cosmetic === id);
+  return stars ? `Encontrá ${stars.stars} estrellas doradas` : "";
+}
+
+function Closet() {
+  const owned = useTower((s) => s.cosmetics);
+  const hat = useTower((s) => s.hat);
+  const trail = useTower((s) => s.trail);
+  const wear = useTower((s) => s.wear);
+  return (
+    <>
+      <p className="text-sm text-foreground/80">Sombreros y estelas: no se compran, se ganan con misiones y estrellas.</p>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {COSMETICS.map((c) => {
+          const has = owned.includes(c.id);
+          const on = hat === c.id || trail === c.id;
+          return (
+            <li key={c.id} className={`flex items-center gap-3 rounded-2xl p-3 ${on ? "bg-sun/20 ring-2 ring-sun" : "bg-white/5"}`} data-testid={`cosmetic-${c.id}`}>
+              <span className={`text-3xl ${has ? "" : "opacity-30 grayscale"}`} aria-hidden>
+                {c.emoji}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-display text-white">
+                  {c.name} <span className="text-xs text-foreground/60">{c.kind === "hat" ? "sombrero" : "estela"}</span>
+                </p>
+                {!has && <p className="text-xs leading-tight text-foreground/60">🔒 {howToGet(c.id)}</p>}
+              </div>
+              {has && (
+                <button type="button" onClick={() => wear(c.id)} className={`btn-chunky shrink-0 px-3 py-1.5 font-display ${on ? "bg-white/10 text-white" : "bg-water text-ink"}`}>
+                  {on ? "SACAR" : "PONER"}
                 </button>
               )}
             </li>

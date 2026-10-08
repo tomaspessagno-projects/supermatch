@@ -2,7 +2,7 @@
 
 import { Billboard, Outlines, RoundedBox, Sparkles, Text } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Rarity } from "../sim/items";
 import { itemDef } from "../sim/items";
@@ -132,6 +132,48 @@ function Deck({ tower }: { tower: TowerData }) {
   );
 }
 
+/** Estrellas doradas escondidas: giran y brillan hasta que las encontrás. */
+function Stars({ tower, frame }: { tower: TowerData; frame: React.RefObject<Frame | null> }) {
+  const refs = useRef<(THREE.Group | null)[]>([]);
+  const geometry = useMemo(() => {
+    const shape = new THREE.Shape();
+    for (let k = 0; k < 10; k++) {
+      const r = k % 2 ? 0.22 : 0.5;
+      const a = (k / 10) * Math.PI * 2 + Math.PI / 2;
+      if (k === 0) shape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else shape.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    shape.closePath();
+    const g = new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 2 });
+    g.center();
+    return g;
+  }, []);
+  useFrame(() => {
+    const f = frame.current;
+    if (!f) return;
+    const found = f.world.progress.stars ?? [];
+    tower.stars.forEach((star, i) => {
+      const g = refs.current[i];
+      if (!g) return;
+      g.visible = !found.includes(star.id);
+      g.rotation.y = f.clock * 2 + i;
+      g.position.y = star.y + Math.sin(f.clock * 2.2 + i) * 0.12;
+    });
+  });
+  return (
+    <>
+      {tower.stars.map((star, i) => (
+        <group key={star.id} position={[star.x, star.y, star.z]} ref={(g) => void (refs.current[i] = g)}>
+          <mesh geometry={geometry} material={toon(PALETTE.gold, { emissive: "#b45309" })}>
+            <Outlines thickness={0.04} color={INK} />
+          </mesh>
+          <Sparkles count={8} scale={1.6} size={5} speed={0.8} color="#fde68a" />
+        </group>
+      ))}
+    </>
+  );
+}
+
 export function Tower({ tower, frame }: { tower: TowerData; frame: React.RefObject<Frame | null> }) {
   return (
     <group>
@@ -140,6 +182,7 @@ export function Tower({ tower, frame }: { tower: TowerData; frame: React.RefObje
       <DynamicBlocks tower={tower} frame={frame} />
       <Hazards tower={tower} frame={frame} />
       <Pickups tower={tower} frame={frame} />
+      <Stars tower={tower} frame={frame} />
       <Deck tower={tower} />
     </group>
   );

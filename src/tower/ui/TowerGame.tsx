@@ -11,8 +11,10 @@ import { liveEventAt, nextEventAt } from "../sim/events";
 import { useTower } from "../store";
 import { input, listenKeyboard } from "../view/input";
 import { play, setMuted, stopAudio, unlockAudio } from "../view/sfx";
+import { Celebrations } from "./Celebrations";
 import { CollectionPanel } from "./CollectionPanel";
 import { Hud, type LiveState } from "./Hud";
+import { MissionsPanel } from "./MissionsPanel";
 import { RunCard } from "./RunCard";
 import { Shop } from "./Shop";
 import { TouchPad } from "./TouchPad";
@@ -135,16 +137,19 @@ export function TowerGame() {
       <div className="absolute inset-0">
         <TowerCanvas teamColor={getTeam(team).color} />
       </div>
-      <Hud muted={muted} onMute={toggleMute} live={live} />
-      {line && (
-        <div key={line.id} className="pointer-events-none absolute left-3 top-24 z-10 w-[min(92vw,520px)] animate-[card-in_0.4s_ease-out_both] sm:left-4">
-          <Host line={line.text} />
-        </div>
-      )}
+      <Hud muted={muted} onMute={toggleMute} live={live} teamColor={getTeam(team).color}>
+        {line && (
+          <div key={line.id} className="pointer-events-none w-[min(92vw,460px)] animate-[card-in_0.4s_ease-out_both]">
+            <Host line={line.text} />
+          </div>
+        )}
+      </Hud>
+      <Celebrations />
       <RunCard />
       <TouchPad />
-      {(panel === "shop" || panel === "pets" || panel === "season") && <Shop />}
+      {(panel === "shop" || panel === "pets" || panel === "closet" || panel === "season") && <Shop />}
       {panel === "collection" && <CollectionPanel />}
+      {panel === "missions" && <MissionsPanel now={live?.now ?? 0} />}
       <Link href="/" className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 font-display text-sm text-foreground/60 underline-offset-4 hover:underline pointer-coarse:hidden">
         ← Salir
       </Link>

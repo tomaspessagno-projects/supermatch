@@ -18,8 +18,10 @@ completo en ese mismo archivo.
    no un castigo.
 4. **Es un show.** Presentador que relata, carteles que flotan, público que se ríe,
    la Copa arriba de todo.
-5. **Cuatro equipos.** Elegís color para siempre; la fama va a sumar para tu equipo
-   (fase 2).
+5. **Cuatro equipos.** Elegís color para siempre; cada metro que subís suma para tu
+   equipo (misión del día y ranking).
+6. **Siempre un objetivo claro.** Una misión activa a la vista, misiones del día,
+   estrellas para encontrar y La Copa arriba.
 
 ## 2. Referencias (los "juegos de ahora")
 
@@ -49,7 +51,65 @@ inflables, piletas, espuma y disfraces gigantes.
 **Ojo con el nombre:** "Supermatch" es una marca del canal. Para un lanzamiento público o
 comercial conviene consultarlo o elegir un nombre propio que haga el guiño.
 
-## 4. El loop
+## 4. Objetivos: siempre hay uno claro
+
+Un juego progresivo necesita que en todo momento sepas **qué hacer ahora** y **para
+qué**. Por eso hay metas en cuatro escalas, todas a la vista:
+
+| Escala | Qué es | Dónde se ve |
+|---|---|---|
+| Ahora | **La misión del programa**: una sola activa, en cadena (24), que te lleva de la orilla a La Copa y después a las temporadas | Tarjeta fija arriba a la izquierda, con barra de avance y premio |
+| Hoy | **3 misiones del día**, iguales para todos, cambian a la medianoche (Argentina) | En la tarjeta ("DEL DÍA 1/3") y en el panel 🎯 |
+| Para juntar | **24 estrellas doradas** escondidas (3 por piso) y la colección de objetos | Barra de la torre (estrellas por piso) y panel 🎯 |
+| Con tu equipo | **Cada metro que subís suma 10 puntos a tu color**: misión del día del equipo y ranking | Línea del equipo arriba al centro y en la tarjeta del intento |
+
+Y la **barra de la torre** (a la derecha) muestra los 8 pisos, dónde estás, tu récord y
+La Copa arriba: siempre se ve cuánto falta.
+
+### La misión del programa
+
+Cada misión cumplida paga fama y, algunas, un título o un cosmético. Salen con festejo
+("¡MISIÓN CUMPLIDA!") y el presentador anuncia la siguiente. El orden enseña el juego:
+
+1. Subí al primer escalón · 2. Caete y cobrá · 3. Comprá una mejora · 4. Descanso del
+piso 1 (título *Aprendiz*) · 5. 10 fichas en un intento · 6. Un regalo · 7. Una estrella
+(🧢 gorra) · 8. Descanso del piso 2 · 9. Súper rebote (🥳 gorrito) · 10. Descanso del
+piso 3 (*Escalador*) · 11. Adoptá una mascota · 12. Descanso del piso 4 (🫧 estela de
+burbujas) · 13. 300 de fama en un intento · 14. Descanso del piso 5 · 15. Trepá una red
+(*Acróbata*) · 16. 6 estrellas · 17. Volá en un géiser · 18. Descanso del piso 7 (⛑️
+casco vikingo) · 19. Un regalo dorado o arcoíris · 20. **¡La Copa!** (*Campeón*, 👑
+corona) · 21. Temporada nueva (*Leyenda*, 🌈 estela arcoíris) · 22. Las 24 estrellas ·
+23. La Copa 3 veces · 24. Temporada 3 (*Leyenda del Supermatch*).
+
+### Misiones del día
+
+Salen de una lista (5 intentos, 40 fichas, 3 regalos, 20 m, 3 súper rebotes, 2 redes,
+"que te tiren 3 veces", 500 de fama, 2 géiseres, una estrella). La fecha elige 3, así
+que son las mismas para todos ese día.
+
+### Estrellas doradas
+
+Tres por piso: una **alta** (saltá desde la plataforma de abajo), una **afuera**
+(flotando sobre la pileta: te tirás por ella y seguro caés, pero queda contada) y una
+**de destreza** (arriba de la cama elástica, solo con súper rebote, o arriba de una
+cornisa). Quedan encontradas para siempre, también entre temporadas. Cada 6, un premio:
+✨ estela de estrellas, 🎩 galera, 🎊 estela de confeti y 😇 aureola dorada.
+
+### Cosméticos y títulos
+
+Sombreros (gorra, gorrito de fiesta, casco vikingo, galera, corona, aureola) y estelas
+(burbujas, estrellas, confeti, arcoíris). No se compran: se ganan. Se eligen en el
+**Vestuario** del kiosco; los que faltan dicen cómo se consiguen. El título aparece al
+lado de tu fama.
+
+### Para tu equipo
+
+Al cobrar un intento, los metros que subiste van al servidor (`tower_cash`): 10 puntos
+por metro para la misión del día de tu color (10.000 entre todos) y para el ranking. El
+servidor pone topes: no más que el alto de la torre por intento, un ritmo máximo de
+subida entre cobros y 5.000 puntos por jugador por día.
+
+## 5. El loop
 
 1. **En la orilla** (el muelle, a la izquierda de la torre): kiosco, ascensor y el
    primer escalón a la derecha. Acá no se gasta energía.
@@ -73,7 +133,7 @@ Los **descansos** (una plataforma ancha al final de cada piso) recargan 12 de en
 la primera vez que los pisás en cada intento, y quedan guardados: con el **Ascensor**
 arrancás desde el más alto.
 
-## 5. La torre
+## 6. La torre
 
 **Vista de frente, sin caracol.** La primera versión subía en espiral alrededor de una
 columna y la cámara giraba todo el tiempo: mareaba. Ahora la torre es una fachada
@@ -106,7 +166,7 @@ energía: al principio alcanza para un piso y algo.
 Cornisas: cada 5 pasos, cerca del medio de la fachada, una cornisa en el otro carril con
 un regalo. Pisos más altos, regalos más raros.
 
-## 6. Objetos, rarezas y mutaciones
+## 7. Objetos, rarezas y mutaciones
 
 19 objetos del programa en 5 rarezas: común (6), raro (25), épico (90), legendario (350)
 y mítico (1500; solo **La Copa Supermatch**, arriba de todo). El valor crece un 20 % por
@@ -121,9 +181,10 @@ piso.
 La **colección** (álbum) muestra los encontrados, con insignias de mutación; los que
 faltan aparecen como "???".
 
-## 7. El kiosco
+## 8. El kiosco
 
-Tres pestañas: **Mejoras**, **Mascotas** y **Temporada**.
+Cuatro pestañas: **Mejoras**, **Mascotas**, **Vestuario** (los cosméticos ganados) y
+**Temporada**.
 
 ### Mejoras
 
@@ -161,7 +222,7 @@ siempre** (temporada 2: ×1,5; temporada 3: ×2…). Te quedás con la colecció
 mascotas. Es el clásico "rebirth" de los juegos progresivos: volver a subir es más
 rápido y cada vuelta rinde más.
 
-## 8. Eventos en vivo
+## 9. Eventos en vivo
 
 Cada 5 minutos, durante 90 segundos, hay un evento que cambia las reglas. Los elige el
 reloj (no hace falta servidor), así que **son los mismos para todos los que están
@@ -175,7 +236,7 @@ suena el silbato y el presentador lo anuncia.
 | 🪙 ¡Fichas dobles! | Cada ficha vale el doble |
 | 🎁 ¡Lluvia de regalos! | Los intentos que empiezan durante el evento tienen premio en todas las cornisas y el triple de chance de mutación |
 
-## 9. Controles
+## 10. Controles
 
 - **Teclado:** flechas o WASD. Izquierda/derecha para ir de costado; adelante es hacia
   la torre (y en las redes, trepar); atrás, hacia la pileta. Espacio para saltar
@@ -187,7 +248,7 @@ suena el silbato y el presentador lo anuncia.
   se aleja.
 - Coyote time (0,1 s) y salto anticipado (0,12 s) para que el control perdone.
 
-## 10. Show y sensación
+## 11. Show y sensación
 
 - Presentador con frases por piso (que explican el truco de cada uno), récord, mochila
   llena, sin nafta, la cima y los eventos en vivo.
@@ -197,18 +258,19 @@ suena el silbato y el presentador lo anuncia.
 - Sonidos: salto, aterrizaje, rebote, golpe, cañonazo, crujido al desinflarse, ficha,
   objeto, silbato de evento, "¡PLAF!" y risas.
 
-## 11. Plan
+## 12. Plan
 
 ### Fase 1 — La Torre jugable ✅
 Simulación con tests, torre de 8 pisos vista de frente, mecánicas por piso, progresión
 y kiosco, mascotas, temporadas, eventos en vivo, colección, render 3D toon, HUD,
-controles de teclado y táctiles. El progreso se guarda en el navegador.
+controles de teclado y táctiles. Objetivos: misión del programa en cadena, misiones del
+día, 24 estrellas, cosméticos, títulos, barra de la torre. Los metros suman al equipo.
+El progreso personal se guarda en el navegador.
 
-### Fase 2 — Que sume para el equipo
-- Guardar el progreso en Supabase (perfil anónimo) y no solo en el navegador.
-- La fama cobrada suma a la Misión del día y al ranking de tu color (RPC con topes de
-  plausibilidad, como `finish_run`).
+### Fase 2 — Que no se pierda nada
+- Guardar el progreso personal en Supabase (perfil anónimo) y no solo en el navegador.
 - Personaje 3D de verdad (modelo + animaciones, ver `ART_DIRECTION.md`).
+- Ranking de jugadores dentro de tu equipo (los que más metros sumaron hoy).
 
 ### Fase 3 — Que vuelvan todos los días
 - **Ver a otros** subiendo en tiempo real (presencia por Supabase Realtime).
@@ -216,7 +278,7 @@ controles de teclado y táctiles. El progreso se guarda en el navegador.
 - Cosméticos por temporada (vinchas, camisetas, estelas).
 - Más pisos y el misterio de arriba de la Copa ("¿?").
 
-## 12. Riesgos
+## 13. Riesgos
 
 - **Rendimiento en celulares viejos:** sombras de una sola luz, pixel ratio tope 1,75,
   geometría instanciada. Si hace falta, se apagan sombras y contornos.

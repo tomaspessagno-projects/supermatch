@@ -3,22 +3,12 @@
 import { Billboard, Outlines, Text } from "@react-three/drei";
 import { useMemo } from "react";
 import * as THREE from "three";
-import type { Theme, Tower } from "../../sim/level";
+import type { Tower } from "../../sim/level";
+import { THEME_COLOR } from "../../ui/colors";
 import { INK, PALETTE, stripes, toon } from "../toon";
 
 export const FONT = "/game/fonts/LuckiestGuy-Regular.ttf";
-
-/** Color de cada piso en la fachada (y en sus carteles). */
-export const THEME_COLOR: Record<Theme, string> = {
-  warmup: "#a5b4fc",
-  soap: "#7dd3fc",
-  bounce: "#f9a8d4",
-  balls: "#fca5a5",
-  hammers: "#fde68a",
-  nets: "#86efac",
-  geysers: "#67e8f9",
-  sky: "#c4b5fd",
-};
+export { THEME_COLOR };
 
 /**
  * La cara de la torre: un inflable gigante con franjas de color por piso y

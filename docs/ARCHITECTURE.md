@@ -16,7 +16,7 @@ archivo.
 | Eventos en vivo | Por reloj (cada 5 min, 90 s): iguales para todos sin servidor |
 | Facción | **Bloqueada** una vez elegida (en el store y en la base) |
 | Auth | Supabase Anonymous Sign-in |
-| Ranking y misiones | `team_totals` y `today_missions` (por ahora no reciben puntos de La Torre) |
+| Ranking y misiones | `team_totals` y `team_missions`: La Torre suma 10 puntos por metro vía la RPC `tower_cash` (con topes) |
 
 ## Principio rector
 
@@ -66,9 +66,13 @@ src/
     │   ├── items.ts          Objetos, rarezas, mutaciones
     │   ├── progression.ts    Mejoras, mascotas, temporadas y stats
     │   ├── events.ts         Eventos en vivo (elegidos por el reloj)
+    │   ├── goals.ts          Misión del programa, misiones del día, premios de estrellas
+    │   ├── cosmetics.ts      Sombreros y estelas
     │   ├── sim.ts            createWorld / step / summarize / applyStats
     │   └── autopilot.ts      Piloto automático para los tests de alcance
-    ├── store.ts              Fama, mejoras, mascotas, temporada, récord, colección (persistido)
+    ├── store.ts              Fama, mejoras, mascotas, temporada, récord, colección,
+    │                         contadores, misiones, estrellas, cosméticos (persistido)
+    ├── team.ts               Manda los metros de cada intento al equipo (RPC tower_cash)
     ├── view/                 three.js (solo dibuja y suena)
     │   ├── TowerCanvas.tsx   <Canvas>, bucle, cámara, evento en vivo, eventos → sonido/store
     │   ├── Player.tsx        Concursante procedural (grupos articulados)
@@ -80,8 +84,9 @@ src/
     │   ├── Effects.tsx       Partículas y carteles flotantes
     │   ├── toon.ts           Paleta, materiales toon cacheados
     │   ├── input.ts  bus.ts  frame.ts  sfx.ts
-    └── ui/                   HUD (con el evento en vivo), tarjeta del intento,
-                              kiosco (mejoras, mascotas, temporada), colección, joystick
+    └── ui/                   HUD (misión activa, barra de la torre, equipo, evento en vivo),
+                              festejos, panel de misiones, tarjeta del intento, kiosco
+                              (mejoras, mascotas, vestuario, temporada), colección, joystick
 ```
 
 ## La simulación
@@ -127,6 +132,21 @@ src/
   automático sobre la simulación real (sin lo que empuja) y verifica qué nivel de Salto
   pide cada piso, que no haya techos sobre el camino ni bloques encimados.
 
+### Objetivos
+
+- `goals.ts` es puro: la cadena `MAIN_QUEST`, `advanceQuest(index, contadores)`, las
+  misiones del día (`dailyMissions(día)`: 3 elegidas con una semilla de la fecha de
+  Argentina) y `STAR_REWARDS`.
+- El store lleva **contadores** (algunos suman, otros guardan el máximo) y
+  `progressWith` cobra todo lo que se cumpla y encola festejos. Lo alimentan las
+  acciones del store (cobrar, comprar, descansos) y los eventos de la simulación
+  (`onSimEvent`: aterrizar, fichas, regalos, estrellas, súper rebotes, redes, géiseres,
+  golpes, la cima).
+- Las partidas viejas (sin contadores) se migran al cargar: los contadores salen de lo
+  que ya habías hecho y las misiones cumplidas se saltean sin premio.
+- Las estrellas encontradas viven en el store y en `world.progress.stars` (la simulación
+  no las vuelve a contar).
+
 ### Cómo ajustar el feel
 
 Todo está en `sim/tuning.ts` (gravedad, velocidades, aceleraciones en el piso, en el aire,
@@ -163,6 +183,13 @@ poder subirse o pasó a ser trivial.
 
 La secret key (ex *service_role*) no se usa en ningún lado: todo lo que escribe el
 cliente pasa por RLS o por RPC.
+
+**`tower_cash(p_climbed)`** (migración `20261012000000_tower_cash.sql`): guarda el cobro
+en `tower_cashes` y suma `metros × 10` al equipo. Rechaza más de 98 m, cobros más
+rápidos que subir esos metros a 4 m/s (+3 s), y corta en 5.000 puntos por jugador por
+día. Bloquea la fila del jugador para que dos cobros simultáneos vayan de a uno. Se
+probó contra un Postgres local con los mismos stubs de `auth` que las migraciones
+anteriores.
 
 ## Trampas conocidas (verificadas)
 

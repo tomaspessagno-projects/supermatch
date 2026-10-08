@@ -44,6 +44,16 @@ export async function joinTeam(team: TeamId): Promise<Profile> {
   return existing;
 }
 
+/**
+ * La Torre: manda los metros subidos en un intento; el servidor los convierte
+ * en puntos para tu equipo (con topes) y devuelve cuántos sumaste.
+ */
+export async function cashTower(climbed: number): Promise<number> {
+  const { data, error } = await supabase().rpc("tower_cash", { p_climbed: Math.max(0, Math.min(98, climbed)) });
+  if (error) throw error;
+  return data;
+}
+
 type TeamTotalRow = { team_id: string; total_score: number; runs_count: number };
 const toTotal = (row: TeamTotalRow): TeamTotal => ({
   team: row.team_id as TeamId,

@@ -7,6 +7,7 @@ import { liveEventAt } from "../sim/events";
 import { buildTower } from "../sim/level";
 import { applyStats, createWorld, type SimEvent, step } from "../sim/sim";
 import { useTower } from "../store";
+import { cashForTeam } from "../team";
 import { bus } from "./bus";
 import { Effects } from "./Effects";
 import { type Frame, playerPosition } from "./frame";
@@ -138,7 +139,7 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
   useEffect(() => {
     const s = useTower.getState();
     frame.current = {
-      world: createWorld(tower, s.stats(), { record: s.record, highestRest: s.highestRest }, Math.floor(Math.random() * 1e9), liveEventAt(Date.now())?.event.id ?? null),
+      world: createWorld(tower, s.stats(), { record: s.record, highestRest: s.highestRest, stars: s.stars }, Math.floor(Math.random() * 1e9), liveEventAt(Date.now())?.event.id ?? null),
       prev: { x: tower.start.x, y: tower.start.y, z: tower.start.z },
       alpha: 0,
       clock: 0,
@@ -169,7 +170,13 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
     const store = useTower.getState();
     const w = frame.current!.world;
     for (const e of events) {
+      // Lo que cuenta para las misiones.
+      store.onSimEvent(e, { height: w.player.y, chips: w.run.chips, stars: w.progress.stars ?? [] });
       switch (e.type) {
+        case "star":
+          play("finish", { volume: 0.8 });
+          play("cheer", { volume: 0.5 });
+          break;
         case "jump":
           play("jump", { vary: 2, volume: e.double ? 0.8 : 0.6 });
           break;
@@ -236,7 +243,10 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
           play("laugh", { vary: 1, volume: 0.7 });
           // Caerse del muelle sin subir nada no es un intento: solo una risa.
           if (e.summary.climbed < 0.5 && e.summary.total === 0) store.announce("¡Ups! La torre está para la derecha. Caminá y saltá al primer escalón.");
-          else store.finishRun(e.summary);
+          else {
+            store.finishRun(e.summary);
+            void cashForTeam(e.summary.climbed);
+          }
           break;
         case "respawn":
           bagWarned.current = false;

@@ -244,6 +244,7 @@ export type Database = {
       mission_day: { Args: never; Returns: string }
       mission_target: { Args: never; Returns: number }
       start_run: { Args: never; Returns: string }
+      tower_cash: { Args: { p_climbed: number }; Returns: number }
       today_missions: {
         Args: never
         Returns: {

@@ -4,6 +4,9 @@ import type { LiveEvent } from "../sim/events";
 import { buildTower } from "../sim/level";
 import { seasonMultiplier } from "../sim/progression";
 import { useTower } from "../store";
+import { Objective } from "./Objective";
+import { TeamLine } from "./TeamLine";
+import { TowerBar } from "./TowerBar";
 
 const FLOORS = buildTower().floors;
 
@@ -15,11 +18,12 @@ const clock = (ms: number) => {
 export type LiveState = { event: LiveEvent | null; endsAt: number; next: LiveEvent; startsAt: number; now: number };
 
 /** Marcador: fama, altura y récord, energía y mochila, y el evento en vivo. */
-export function Hud({ muted, onMute, live }: { muted: boolean; onMute: () => void; live: LiveState | null }) {
+export function Hud({ muted, onMute, live, teamColor, children }: { muted: boolean; onMute: () => void; live: LiveState | null; teamColor: string; children?: React.ReactNode }) {
   const fame = useTower((s) => s.fame);
   const record = useTower((s) => s.record);
   const season = useTower((s) => s.season);
   const runs = useTower((s) => s.runs);
+  const title = useTower((s) => s.title);
   const hud = useTower((s) => s.hud);
   const openPanel = useTower((s) => s.openPanel);
   const energy = hud.energyMax ? hud.energy / hud.energyMax : 0;
@@ -28,17 +32,24 @@ export function Hud({ muted, onMute, live }: { muted: boolean; onMute: () => voi
   return (
     <>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-3 sm:p-4">
-        <div className="flex flex-col">
-          <span className="font-display text-xs text-foreground/80 sm:text-sm">FAMA</span>
-          <span className="text-cartoon text-3xl text-sun tabular-nums sm:text-4xl" data-testid="fame">
-            ⭐ {Math.floor(fame).toLocaleString("es-AR")}
-          </span>
-          {season > 0 && (
-            <span className="font-display text-xs text-rubber" data-testid="season-badge">
-              TEMPORADA {season + 1} · ×{seasonMultiplier(season).toLocaleString("es-AR")}
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-col">
+            <span className="font-display text-xs text-foreground/80 sm:text-sm">
+              FAMA · <span className="text-water" data-testid="title">{title.toUpperCase()}</span>
             </span>
-          )}
-          {hud.chips > 0 && <span className="font-display text-sm text-water">+{hud.chips} en este intento</span>}
+            <span className="text-cartoon text-3xl text-sun tabular-nums sm:text-4xl" data-testid="fame">
+              ⭐ {Math.floor(fame).toLocaleString("es-AR")}
+            </span>
+            {season > 0 && (
+              <span className="font-display text-xs text-rubber" data-testid="season-badge">
+                TEMPORADA {season + 1} · ×{seasonMultiplier(season).toLocaleString("es-AR")}
+              </span>
+            )}
+            {hud.chips > 0 && <span className="font-display text-sm text-water">+{hud.chips} en este intento</span>}
+          </div>
+          <Objective now={live?.now ?? 0} />
+          {/* El presentador habla debajo de la misión. */}
+          {children}
         </div>
         <div className="flex flex-col items-center text-center">
           <span className="text-cartoon text-4xl text-white tabular-nums sm:text-5xl" data-testid="height">
@@ -56,8 +67,12 @@ export function Hud({ muted, onMute, live }: { muted: boolean; onMute: () => voi
               PRÓXIMO EVENTO: {live.next.emoji} EN {clock(live.startsAt - live.now)}
             </span>
           ) : null}
+          <TeamLine />
         </div>
-        <div className="pointer-events-auto flex gap-2">
+        <div className="pointer-events-auto flex flex-wrap justify-end gap-2">
+          <HudButton label="Misiones" onClick={() => openPanel("missions")} testId="open-missions">
+            🎯
+          </HudButton>
           <HudButton label="Colección" onClick={() => openPanel("collection")} testId="open-collection">
             📖
           </HudButton>
@@ -86,6 +101,8 @@ export function Hud({ muted, onMute, live }: { muted: boolean; onMute: () => voi
           🎒 {hud.bag}/{hud.bagMax}
         </span>
       </div>
+
+      <TowerBar teamColor={teamColor} />
 
       {runs < 2 && hud.onDeck && !hud.nearKiosk && (
         <p className="pointer-events-none absolute bottom-24 left-1/2 z-10 w-max max-w-[92vw] -translate-x-1/2 rounded-2xl border-4 border-ink bg-ink/70 px-4 py-2 text-center font-display text-sm text-white pointer-coarse:hidden">

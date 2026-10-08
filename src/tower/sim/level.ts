@@ -95,6 +95,16 @@ export type Net = Box & { id: number; floor: number; pillar: number };
 /** Lugar donde puede aparecer una ficha (camino) o un objeto (cornisa). */
 export type Spot = Vec3 & { id: number; floor: number; ledge: boolean };
 
+/**
+ * Estrella dorada escondida: tres por piso, fuera del camino. Una vez que la
+ * tocás queda encontrada para siempre (aunque después te caigas).
+ * - "high": arriba de una plataforma, hay que saltar para agarrarla.
+ * - "out": flotando sobre la pileta: te tirás por ella (y seguro caés).
+ * - "skill": arriba de una cama elástica (solo con súper rebote) o de una cornisa.
+ */
+export type StarKind = "high" | "out" | "skill";
+export type Star = Vec3 & { id: number; floor: number; kind: StarKind };
+
 export type Theme = "warmup" | "soap" | "bounce" | "balls" | "hammers" | "nets" | "geysers" | "sky";
 
 export type Floor = {
@@ -119,6 +129,7 @@ export type Tower = {
   geysers: Geyser[];
   nets: Net[];
   spots: Spot[];
+  stars: Star[];
   floors: Floor[];
   /** Altura de la cima (la Copa). */
   top: number;
@@ -431,6 +442,8 @@ export function buildTower(seed = 7): Tower {
     bottom = floorTop;
   });
 
+  const stars = hideStars(blocks, path, floors, () => id++);
+
   return {
     blocks,
     path,
@@ -440,6 +453,7 @@ export function buildTower(seed = 7): Tower {
     geysers,
     nets,
     spots,
+    stars,
     floors,
     top,
     rests,
@@ -449,6 +463,44 @@ export function buildTower(seed = 7): Tower {
     elevator,
     wall,
   };
+}
+
+/** Las tres estrellas de cada piso (ver `Star`), en lugares con aire libre arriba. */
+function hideStars(blocks: Block[], path: PathStep[], floors: Floor[], nextId: () => number): Star[] {
+  const stars: Star[] = [];
+  const byId = new Map(blocks.map((b) => [b.id, b]));
+  /** ¿No hay ningún bloque en esta columna de aire (para saltar hasta ahí y que la estrella no quede adentro)? */
+  const clear = (x: number, z: number, y0: number, y1: number, r = 0.9) =>
+    !blocks.some((b) => b.maxY > y0 && b.minY < y1 && b.minX < x + r && b.maxX > x - r && b.minZ < z + r && b.maxZ > z - r);
+  /** El primero de la lista (empezando cerca de `k`) que cumpla. */
+  const pick = <T,>(list: T[], k: number, ok: (t: T) => boolean): T | undefined => {
+    const start = Math.floor(list.length * k);
+    for (let i = 0; i < list.length; i++) {
+      const t = list[(start + i) % list.length];
+      if (ok(t)) return t;
+    }
+    return undefined;
+  };
+  for (const floor of floors) {
+    const steps = path.filter((s) => s.floor === floor.index && s.kind === "block").map((s) => byId.get(s.id)!);
+    const plain = steps.filter((b) => b.kind === "normal");
+    const above = (b: Block, h: number) => clear((b.minX + b.maxX) / 2, (b.minZ + b.maxZ) / 2, b.maxY + 0.05, b.maxY + h + 0.6);
+    // Alta: hay que saltar desde la plataforma.
+    const high = pick(plain, 0.3, (b) => above(b, 3.4))!;
+    stars.push({ id: nextId(), floor: floor.index, kind: "high", ...centerOf(high), y: high.maxY + 3.4 });
+    // Afuera: sobre la pileta, delante de una plataforma del carril de afuera.
+    const outer = plain.filter((b) => (b.minZ + b.maxZ) / 2 > 3);
+    const outOk = (b: Block) => clear((b.minX + b.maxX) / 2, b.maxZ + 1.8, b.maxY - 2, b.maxY + 3) && b !== high;
+    const out = pick(outer, 0.6, outOk) ?? pick(plain, 0.6, outOk)!;
+    stars.push({ id: nextId(), floor: floor.index, kind: "out", x: (out.minX + out.maxX) / 2, y: out.maxY + 1.2, z: out.maxZ + 1.8 });
+    // De destreza: arriba de una cama elástica (súper rebote) o de una cornisa.
+    const tramp = steps.find((b) => b.kind === "trampoline" && above(b, 6.6));
+    const ledge = blocks.find((b) => b.kind === "ledge" && b.floor === floor.index && above(b, 2.6));
+    const other = pick(plain, 0.8, (b) => b !== high && b !== out && above(b, 3.4))!;
+    const spot = tramp ? { ...centerOf(tramp), y: tramp.maxY + 6.6 } : ledge ? { ...centerOf(ledge), y: ledge.maxY + 2.6 } : { ...centerOf(other), y: other.maxY + 3.4 };
+    stars.push({ id: nextId(), floor: floor.index, kind: "skill", ...spot });
+  }
+  return stars;
 }
 
 const frac = (v: number) => ((v % 1) + 1) % 1;
