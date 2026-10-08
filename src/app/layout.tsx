@@ -15,7 +15,7 @@ const display = Luckiest_Guy({
 
 export const metadata: Metadata = {
   title: "Supermatch",
-  description: "Minijuegos físicos torpes y caóticos. Elegí tu equipo y sumá puntos.",
+  description: "Una torre inflable y enjabonada: subí, caete a la pileta, mejorá y volvé a subir. Elegí tu equipo y sumá fama.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

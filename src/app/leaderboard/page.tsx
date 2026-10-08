@@ -8,7 +8,7 @@ export default function LeaderboardPage() {
       <div className="text-center">
         <h1 className="text-cartoon -rotate-2 text-5xl text-sun sm:text-6xl">RANKING</h1>
         <p className="mt-2 flex items-center justify-center gap-2 text-foreground/70">
-          <span className="size-2 animate-pulse rounded-full bg-red-500" /> En vivo: cada partida suma a su equipo
+          <span className="size-2 animate-pulse rounded-full bg-red-500" /> En vivo: los puntos de cada equipo
         </p>
       </div>
       <MissionBoard />

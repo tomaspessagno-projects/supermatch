@@ -1,6 +1,75 @@
 # Dirección de arte
 
-## Estilo
+## La Torre (3D)
+
+**Toon con bloques:** formas redondeadas y simples, colores saturados planos, sombreado
+en 3 tonos (`MeshToonMaterial` con un degradé) y contorno de tinta `#1F1147`. Todo lo
+que se ve hoy es geometría hecha por código (bloques, columna a rayas, nubes, burbujas,
+regalos), salvo el fondo del estudio (`public/game/sprites/bg-studio.jpg`) y la fuente.
+
+| Uso | Color |
+|---|---|
+| Tinta / contornos | `#1F1147` |
+| Agua | `#22D3EE` |
+| Columna | rosa `#F472B6` y blanco a rayas |
+| Escalones | rosa, cian, amarillo, violeta, rojo, blanco |
+| Jabón | `#E0F2FE` con espuma |
+| Cima | dorado `#FBBF24` |
+
+### Pedido: el concursante en 3D
+
+Hoy el concursante es un muñeco procedural (cajas y esferas articuladas por código).
+Para que se vea como un juego de verdad hace falta un modelo 3D con animaciones. Se
+genera con una cuenta propia, sin programar:
+
+1. **Modelo:** en **Tripo** (tripo3d.ai) o **Meshy** (meshy.ai), *Image to 3D* con
+   `art/source/ref-personaje.jpg` (vincha, remera blanca, short, zapatillas). Estilo
+   *cartoon / stylized*, **pose en T o A**, de cuerpo entero.
+   - Prompt de apoyo: *"stylized cartoon game show contestant, chunky proportions, big
+     head, white t-shirt, white shorts, red sneakers, sweatband, clean simple shapes,
+     T-pose, full body, game-ready low poly"*.
+   - Límite: unos **10.000–20.000 triángulos** y **una textura de 1024 px**.
+   - Ideal: la **remera en un material aparte** (blanca), así el juego la tiñe con el
+     color del equipo.
+2. **Esqueleto:** el auto-rig de Tripo/Meshy, o subir el modelo a **Mixamo**
+   (mixamo.com, gratis con cuenta de Adobe) y usar su auto-rigger.
+3. **Animaciones** (Mixamo, *In Place* tildado, 30 fps):
+
+   | Nombre del clip | Mixamo sugerido | Uso |
+   |---|---|---|
+   | `idle` | Breathing Idle / Happy Idle | Parado |
+   | `run` | Running (in place) | Caminar y correr |
+   | `jump` | Jumping Up | Despegue |
+   | `fall` | Falling Idle | En el aire bajando |
+   | `land` | Falling To Landing | Aterrizaje |
+   | `slip` | Slipping / Stumble Backwards | Sin energía, resbalón |
+   | `hit` | Hit Reaction / Flying Back Death | Golpe de barredora |
+   | `swim` | Treading Water | En la pileta |
+   | `cheer` | Victory / Celebrating | La cima y los récords |
+
+4. **Exportar** como **GLB** (o FBX con piel; se convierte a GLB) y subirlo a
+   `art/source/3d/concursante.glb` (o mandarlo por el chat). Si las animaciones vienen
+   en archivos separados, también sirven.
+
+El juego ya tiene los estados para cada clip; cuando llegue el GLB se reemplaza el
+muñeco procedural con `useGLTF` + `useAnimations` de drei.
+
+### Más adelante (opcionales)
+
+- **Regalos y objetos en 3D** (patito, silbato, zapatilla, copa…), mismo estilo, un GLB
+  chico por objeto. Hoy son cajas de regalo de colores por rareza.
+- **Mascotas** (fase 3): 3 o 4 bichos simples (patito, perrito, nube con cara).
+- **Texturas:** lona inflable para la columna, espuma de jabón (1024×1024, que se
+  repitan sin costura).
+
+---
+
+## Minijuegos 2D (archivado)
+
+Lo que sigue es la dirección de arte de los minijuegos 2D, que quedaron en el tag
+`minijuegos-2d`. Sirve como referencia de estilo; los sprites siguen en `public/`.
+
+### Estilo 2D
 
 Cartoon 2D de party game de TV: contornos gruesos violeta oscuro, colores planos y
 saturados, una sola sombra suave, formas redondeadas y proporciones exageradas.
@@ -484,7 +553,8 @@ El script:
 3. En el torso y la manga separa la tela blanca en una capa `-tint` que el juego
    multiplica por el color del equipo.
 4. Escribe `public/game/sprites/` (juego), `public/ui/` (React) y el manifiesto
-   `src/game/assets/manifest.ts` con el tamaño de cada sprite.
+   `src/game/assets/manifest.ts` con el tamaño de cada sprite (ese manifiesto era del
+   motor 2D; La Torre no lo usa).
 
 Si se regenera una hoja con otro layout, hay que ajustar sus cajas en `CONFIG`. Cuando
 dos piezas se tocan (como las cabezas del presentador), el modo `seed` se queda con la

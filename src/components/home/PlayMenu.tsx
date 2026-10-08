@@ -1,29 +1,25 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect } from "react";
 import { TeamPicker } from "@/components/TeamPicker";
 import { getTeam } from "@/lib/teams";
-import { leaveRoom, useRoom } from "@/online/room";
 import { useSession } from "@/store/session";
+import { useTower } from "@/tower/store";
 
-/**
- * Portada: primero el equipo (para siempre) y después cómo jugar: solo contra
- * la compu, una carrera en vivo con desconocidos o una sala con amigos.
- */
+/** Portada: primero el equipo (para siempre) y después, a la torre. */
 export function PlayMenu() {
   const team = useSession((s) => s.team);
   const nickname = useSession((s) => s.nickname);
   const profileStatus = useSession((s) => s.profileStatus);
   const loadProfile = useSession((s) => s.loadProfile);
-  const kind = useSession((s) => s.kind);
-  const chooseKind = useSession((s) => s.chooseKind);
+  const record = useTower((s) => s.record);
+  const fame = useTower((s) => s.fame);
+  const runs = useTower((s) => s.runs);
 
   useEffect(() => {
     void loadProfile();
-    // Volver a la portada es salir de cualquier sala o búsqueda.
-    if (useRoom.getState().status !== "idle") void leaveRoom();
   }, [loadProfile]);
 
   if (profileStatus !== "ready" && !team) {
@@ -46,72 +42,14 @@ export function PlayMenu() {
           por el <strong className="font-display text-lg text-white">{name}</strong>
         </p>
       </div>
-      {/* Competir (carrera contra los otros tres) o en equipo (El Colchón, los 4 juntos). */}
-      <div className="grid grid-cols-2 gap-1 rounded-2xl border-4 border-ink bg-ink/60 p-1" role="radiogroup" aria-label="Tipo de juego">
-        {(
-          [
-            ["race", "COMPETIR", "Puente y Tronco"],
-            ["coop", "EN EQUIPO", "El Colchón"],
-          ] as const
-        ).map(([value, label, detail]) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={kind === value}
-            data-testid={`kind-${value}`}
-            onClick={() => chooseKind(value)}
-            className={`flex flex-col items-center rounded-xl px-3 py-1.5 transition ${kind === value ? "bg-sun text-ink" : "text-foreground/70 hover:bg-white/10"}`}
-          >
-            <span className="font-display text-lg">{label}</span>
-            <span className="text-xs opacity-80">{detail}</span>
-          </button>
-        ))}
-      </div>
-      {kind === "race" ? (
-        <>
-          <ModeButton href="/play" solo title="JUGAR SOLO" subtitle="Vos contra 3 de la compu" tone="bg-sun text-ink" testId="mode-solo" />
-          <ModeButton href="/online?modo=rapida" title="CARRERA ONLINE" subtitle="En vivo contra gente de verdad" tone="bg-water text-ink" testId="mode-quick" />
-        </>
-      ) : (
-        <>
-          <ModeButton href="/play" solo title="CON LA COMPU" subtitle="Vos y 3 compañeros de la compu" tone="bg-sun text-ink" testId="mode-solo" />
-          <ModeButton href="/online?modo=rapida&tipo=equipo" title="EQUIPO ONLINE" subtitle="Con gente de verdad, todos juntos" tone="bg-water text-ink" testId="mode-quick" />
-        </>
-      )}
-      <ModeButton href="/online" title="CON AMIGOS" subtitle="Armá una sala y pasales el código" tone="bg-rubber text-ink" testId="mode-friends" />
+      <Link href="/torre" data-testid="play-tower" className="btn-chunky flex flex-col items-start bg-sun px-5 py-4 text-left text-ink">
+        <span className="font-display text-3xl">{runs > 0 ? "¡VOLVER A LA TORRE!" : "¡A LA TORRE!"}</span>
+        <span className="text-sm opacity-80">
+          {runs > 0
+            ? `Tu récord: ${record.toFixed(1)} m · ${Math.floor(fame).toLocaleString("es-AR")} de fama para gastar`
+            : "Subí, caete a la pileta, mejorá y volvé a subir"}
+        </span>
+      </Link>
     </div>
-  );
-}
-
-function ModeButton({
-  href,
-  solo = false,
-  title,
-  subtitle,
-  tone,
-  testId,
-}: {
-  href: string;
-  solo?: boolean;
-  title: string;
-  subtitle: string;
-  tone: string;
-  testId: string;
-}) {
-  const router = useRouter();
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      onClick={() => {
-        if (solo) useSession.getState().playSolo();
-        router.push(href);
-      }}
-      className={`btn-chunky flex flex-col items-start px-5 py-3 text-left ${tone}`}
-    >
-      <span className="font-display text-2xl">{title}</span>
-      <span className="text-sm opacity-80">{subtitle}</span>
-    </button>
   );
 }

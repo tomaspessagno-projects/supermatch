@@ -1,378 +1,170 @@
-# Diseño de juego — Supermatch
+# Diseño de juego — Supermatch: La Torre
 
-## 1. Visión
+> Una torre inflable gigante, enjabonada, en medio de una pileta. Subís todo lo que
+> podés, te caés al agua (siempre te caés), cobrás la fama de lo que subiste y juntaste,
+> mejorás al concursante en el kiosco y volvés a subir más alto.
 
-> Un episodio de un programa de juegos de TV en 3 minutos: tu equipo contra los otros
-> tres, pruebas disparatadas y cada caída es un chiste.
+La versión anterior (minijuegos 2D: El Puente Resbaladizo, El Tronco Loco, El Colchón y
+las carreras online) quedó archivada en el tag de git **`minijuegos-2d`**, con su diseño
+completo en ese mismo archivo.
 
-**Pilares** (toda decisión se mide contra esto):
+## 1. Pilares
 
-1. **Torpeza cómica.** El control es físico e impreciso a propósito, y fallar da gracia,
-   no bronca. Cada prueba tiene **una sola** restricción física cómica, y es distinta en
-   cada una (hielo, balde que chapotea, tronco que gira…).
-2. **Es un show.** Presentación, silbato, relato, tabla entre pruebas, podio final.
-3. **Cuatro equipos.** El color del equipo está en todos lados, y los rivales se ven
-   compitiendo al mismo tiempo, aunque el juego sea asincrónico.
-4. **Sesiones cortas.** Un episodio de unos 3 minutos; cada prueba de 35 a 45 s; volver
-   a jugar al instante.
-5. **Justo.** Simulaciones deterministas, mismo episodio para todos el mismo día, y el
-   puntaje se valida en el servidor.
+1. **Un loop corto que se repite.** Un intento dura de 20 s a 2 min: subir → caer →
+   cobrar → mejorar → subir. Siempre hay "uno más".
+2. **Progreso que se acumula.** Cada intento deja algo (fama, objetos, récord, un
+   descanso nuevo). Nada se pierde al caer: caer *es* cobrar.
+3. **Torpeza cómica.** Jabón, viento, barredoras y burbujas. Caerse al agua es el chiste,
+   no un castigo.
+4. **Es un show.** Presentador que relata, carteles que flotan, público que se ríe,
+   la Copa arriba de todo.
+5. **Cuatro equipos.** Elegís color para siempre; la fama va a sumar para tu equipo
+   (fase 2).
 
-## 2. Qué tomamos del programa original (y qué no)
+## 2. Referencias (los "juegos de ahora")
+
+| Juego | Qué tomamos |
+|---|---|
+| Los de cavar un pozo (*Dig*) | Acción simple en loop, un límite que te obliga a volver (energía) y mejoras que te dejan llegar más lejos |
+| *Grow a Garden* | Rarezas y **mutaciones** que multiplican el valor; eventos en vivo y mascotas (más adelante) |
+| *Steal a Brainrot*, *Pet Simulator 99* | Precios que escalan, colección para completar, coleccionables raros que dan ganas de mostrar |
+| *Tower of Hell* y los *obbies* | La torre por pisos con obstáculos, cada piso un tema |
+
+Anatomía común: **acción corta repetible → un tope que te hace volver → vender →
+mejorar → zonas nuevas → rarezas y mutaciones → eventos → mascotas → renacer (temporada)
+→ un misterio arriba de todo.**
+
+## 3. Qué tomamos del programa original (y qué no)
 
 Supermatch (Telefe, 1992–2010) emitía la versión australiana de *It's a Knockout*:
 cuatro equipos (azul, verde, amarillo y colorado) en pruebas físicas absurdas, con
-muñecos gigantes, escenografías enormes, piletas, disfraces y una tabla de puntos.
+inflables, piletas, espuma y disfraces gigantes.
 
 | Tomamos (formato, que no tiene dueño) | No tomamos (tiene dueño) |
 |---|---|
-| 4 equipos por color, tabla, relato | Logos, música y grafismos de Telefe |
-| Pruebas con agua, espuma, inflables, disfraces gigantes | Nombres o personajes del programa |
+| 4 equipos por color, relato, público | Logos, música y grafismos de Telefe |
+| Inflables, agua, jabón, espuma | Nombres o personajes del programa |
 | El tono: caerse es el espectáculo | Imágenes o clips originales |
 
 **Ojo con el nombre:** "Supermatch" es una marca del canal. Para un lanzamiento público o
 comercial conviene consultarlo o elegir un nombre propio que haga el guiño.
 
-## 3. Diagnóstico de hoy
+## 4. El loop
 
-- **Un solo verbo:** correr y saltar. **Un solo suelo:** jabón. **Una sola prueba,**
-  repetida 3 veces.
-- **Caer al agua termina la prueba de golpe:** partidas de 3 s, poca agencia.
-- **No hay rivales a la vista,** así que no se siente que "competís con los otros equipos".
-- **No hay show:** ni presentación, ni cuenta regresiva, ni tabla, ni podio. **No hay sonido.**
-- **El puntaje premia solo llegar lejos:** no hay decisiones de riesgo/recompensa.
+1. **En la orilla** (el muelle): kiosco, ascensor, cartel del piso 1. Acá no se gasta
+   energía.
+2. **Subís** por el caracol de escalones alrededor de la columna inflable. Cada salto y
+   cada segundo arriba gastan **energía**.
+3. **Juntás** fichas en el camino y regalos en las cornisas (si te entran en la mochila).
+4. **Sin energía** el concursante se cansa, se resbala para afuera y cae a la pileta.
+   También caés si errás un salto o te tira una barredora.
+5. **Al caer se cobra** (tarjeta "¡AL AGUA!"):
+   - 1 de fama por metro subido en el intento,
+   - 3 de fama por cada metro por encima de tu récord,
+   - las fichas,
+   - el valor de los objetos de la mochila (que van a la colección),
+   - 500 extra si llegaste a la cima.
+6. **Kiosco**: gastás la fama en mejoras. Volvés a la orilla y arrancás otro intento.
 
-## 4. Estructura de un episodio
+Los **descansos** (un anillo cada 12 m) recargan 12 de energía la primera vez que los
+pisás en cada intento, y quedan guardados: con el **Ascensor** arrancás desde el más alto.
 
-| Momento | Duración | Qué pasa |
-|---|---|---|
-| Apertura | 5 s | Presentador/a: "¡Bienvenidos!" Tu equipo y los rivales en pantalla |
-| Presentación de prueba | 4 s | Nombre, una regla en una línea y los controles con un mini demo |
-| 3, 2, 1, silbato | 3 s | El árbitro da la largada |
-| Prueba | 35–45 s | Jugás contra los 3 rivales (bots, después fantasmas reales) |
-| Fin de prueba | 3 s | "¡Tiempo!" o "¡Llegó!": puntos de la prueba |
-| Tabla | 4 s | Los puntos "vuelan" a la tabla del episodio; posiciones de los 4 equipos |
-| (×3 pruebas) | | |
-| Final | 8 s | Podio de equipos, tu aporte al ranking global, "la caída del episodio" (repetición) |
+## 5. La torre
 
-Total: unos 3 minutos. Se puede saltear todo menos las pruebas.
+Seis pisos de 12 m (72 m en total), generados con semilla fija (todos ven la misma
+torre). Cada piso termina en un anillo de descanso; el último es la **cima**, con la
+Copa.
 
-## 5. Catálogo de pruebas
-
-Cada prueba cambia al menos dos de estos ejes: **verbo, control, cámara, física cómica,
-forma de puntuar**.
-
-| Prueba | Verbo | Control | Cámara | Gracia física | Puntaje | Inspiración |
-|---|---|---|---|---|---|---|
-| **El Puente Resbaladizo** (v2) | Correr | ←→ + salto | Lateral con scroll | Piso de jabón | Distancia + tiempo + pompas | Pasarelas enjabonadas |
-| **Baldes al Tanque** | Cargar con cuidado | ←→ + salto, ↓ = paso cuidadoso | Lateral, 2 pantallas | El agua chapotea y se derrama | Litros entregados | Relevos llenando baldes |
-| **El Tronco Loco** | Equilibrar | ←→ + salto | Fija | El tronco gira y cambia de sentido | Segundos arriba + burbujas | Troncos giratorios sobre pileta |
-| *Justa en la Pileta* (después) | Duelo | Ataque alto/bajo, bloqueo | Fija | Garrote de espuma, viga angosta | Rounds ganados | Duelo de garrotes sobre el agua |
-| *La Catapulta* (después) | Apuntar | Mantener para cargar, ↑↓ ángulo | Fija | Viento, blancos que se mueven | Impactos | Tiro de globos de agua |
-| *Disfraz Gigante* (después) | Caminar | ←→ para contrapesar | Lateral | Disfraz de 3 m que se bambolea; la alfombra se mueve | Distancia | Carreras con disfraces gigantes |
-
-**MVP del episodio:** Puente v2, Baldes al Tanque y Tronco Loco. Son tres verbos
-distintos (velocidad, cuidado, ritmo) con controles que entran en tres botones, ideal
-para el celular. Las otras tres entran en la rotación del "episodio del día".
-
-### 5.1 El Puente Resbaladizo v2: carrera
-
-- **Cambio de regla:** caer al agua **no termina la prueba**. El jugador vuelve a la
-  última bandera con 1,5 s de penalización (salpicón, chapuzón y vuelta). La prueba dura
-  hasta la meta o 45 s. Más intentos, más caídas, más risa.
-- **Obstáculos nuevos:**
-  - **trampolín inflable:** te lanza alto; atajo o trampa;
-  - **cinta transportadora al revés:** un tramo que te empuja para atrás;
-  - **martillo de espuma:** un péndulo que barre la pasarela con un ritmo fijo;
-  - **cañón de espuma:** dispara pelotas en arco que te empujan.
-- **Riesgo y recompensa:** pompas doradas (+puntos) puestas en los caminos peligrosos,
-  como arriba de un rodillo o al borde de un charco.
-- **Puntaje:** distancia (hasta 500) + llegar (150) + tiempo sobrante (hasta 200) +
-  pompas (hasta 150). El máximo sigue siendo 1000.
-
-### 5.2 Baldes al Tanque: cargar con cuidado
-
-La contracara del Puente: acá el piso es normal y lo difícil es **no apurarse**.
-
-- Vas y venís entre la **fuente** (izquierda), donde el balde se llena solo, y el
-  **tanque de tu equipo** (derecha), que tiene un medidor gigante. Son 45 s.
-- **El balde chapotea:** la superficie del agua es un resorte que reacciona a tu
-  aceleración. Si el chapoteo pasa el borde, se derrama en proporción. Saltar o recibir un
-  golpe derrama de golpe. **↓ = paso cuidadoso:** más lento y con menos chapoteo; la
-  decisión de cuándo apurarse es la habilidad.
-- **Obstáculos:**
-  - martillos de espuma que cruzan el camino (timing);
-  - escalones inflables (hay que saltar, y saltar derrama);
-  - un charco de jabón corto, guiño al Puente;
-  - rivales que te cruzan en el camino de vuelta.
-- **Puntaje:** litros entregados, normalizado a 1000. **Falla:** perder agua o tropezar
-  y soltar el balde (lo levantás vacío).
-- **Arco del nivel:**
-  1. ida plana para aprender el chapoteo;
-  2. aparecen los martillos;
-  3. escalones inflables;
-  4. en los últimos 10 s el público cuenta en voz alta.
-
-### 5.3 El Tronco Loco: equilibrio y ritmo
-
-- Cámara fija. Un **tronco gigante** gira sobre la pileta, visto de frente (un círculo con
-  anillos y corteza). Estás parado arriba.
-- **La superficie del tronco te arrastra:** hay que correr en contra para quedarte arriba.
-  Si te alejás demasiado de la cima, te caés.
-- **El giro cambia:** acelera, frena y se invierte. Cada cambio se anuncia un segundo antes
-  (crujido, el tronco tiembla) para que sea legible y justo.
-- **Cañones de espuma** disparan pelotas a dos alturas: hay que saltar o agacharse. Las
-  **burbujas doradas** que flotan dan puntos si saltás a reventarlas.
-- **3 vidas,** 45 s. **Puntaje:** segundos arriba × 15 + burbujas, hasta 1000.
-- **Rivales:** los troncos de los otros 3 equipos se ven atrás, más chicos, con sus
-  concursantes cayéndose.
-
-## 6. Diseño de niveles
-
-**Principios:**
-
-1. **Enseñar, desarrollar, sorprender, cerrar.** Cada obstáculo aparece primero solo y en
-   un lugar seguro, después se combina, después tiene una vuelta de tuerca, y al final hay
-   un sprint.
-2. **Todo se telegrafía.** Sombras, temblores o sonido antes de cada peligro. Códigos de
-   color fijos:
-   - **cian** = agua (caída);
-   - **rosa** = goma (rebota);
-   - **amarillo/dorado** = premio;
-   - **rojo** = peligro inminente.
-3. **Riesgo y recompensa siempre presentes:** el camino seguro y el camino con pompas.
-4. **Ritmo:** tensión y respiro. Nunca dos picos de dificultad seguidos sin un tramo
-   tranquilo.
-5. **Legible en el celular:** los obstáculos se reconocen por silueta, sin leer texto.
-
-**Bloques y semilla diaria.** Cada prueba se arma con **bloques diseñados a mano**
-(segmentos de 600 a 1200 px con un desafío cada uno) marcados por dificultad. El
-**episodio del día** usa una semilla para elegir y ordenar bloques respetando la curva de
-dificultad. Así todos juegan lo mismo ese día (el ranking es justo) y mañana es distinto.
-
-**Medir para ajustar.** Registramos dónde cae la gente (posición, bloque, causa). Si más
-del 40 % cae en el mismo bloque, ese bloque se rediseña. Los tests de intención (como los
-del Puente) y un bot que tiene que poder ganar validan cada bloque nuevo.
-
-## 7. Personajes
-
-| Personaje | Rol | Dónde aparece |
-|---|---|---|
-| **Concursante** | El jugador. Camiseta del color del equipo | Todas las pruebas |
-| **Rivales** | Concursantes de los otros 3 equipos. Bots con distinto nivel; después, fantasmas de la mejor partida del día de cada equipo | En las pruebas, semitransparentes, y en la barra de progreso |
-| **Presentador/a** | Relata: abre, presenta cada prueba, festeja y se burla de las caídas | Pantallas entre pruebas (React), con burbujas de texto |
-| **Árbitro** | Silbato, banderas, tarjeta en las caídas | Largada y final de cada prueba |
-| **Muñecos gigantes** | Inflables de la escenografía (pato, tiburón, pulpo); algunos son obstáculos | Fondos y obstáculos |
-| **Público** | Reacciona a lo que pasa ("¡uhhh!", risas, aplausos) | Fondo animado y sonido |
-
-Más adelante: **4 concursantes para elegir** (distintos cuerpos, géneros y tonos de piel)
-y **disfraces** cosméticos que se desbloquean jugando.
-
-## 8. Puntaje, comodín y ranking
-
-- Cada prueba da de **0 a 1000** (validado en el servidor con `max_score`).
-- **Comodín:** antes del episodio elegís una prueba que vale **doble**. Es estrategia: ¿la
-  que mejor jugás o la más riesgosa? El servidor lo valida.
-- **Ranking:**
-  - por equipo, **del día** (el episodio del día);
-  - de la **temporada** (semanal, se reinicia los lunes);
-  - **histórico.**
-- **Récord personal** por prueba, y "tu aporte" al equipo en la pantalla final.
-
-## 9. Sensación ("juice") y sonido
-
-- **Pausa de impacto** (60–80 ms congelado) en cada golpe, **cámara lenta** en caídas
-  espectaculares, sacudón de cámara (ya está), anticipación, y estirar y aplastar (ya está).
-- **Sonido:** SFX para cada evento (boing, splash, silbato, chapoteo, crujido del
-  tronco), música de programa de juegos en loop, público que reacciona y frases del
-  presentador.
-- **Repetición:** la simulación es determinista, así que grabando el input se puede
-  repetir la mejor caída del episodio en cámara lenta y compartirla.
-
-## 10. Plan de ejecución
-
-Tamaños: **S** = 1 iteración, **M** = 1–2, **L** = 2–4.
-
-### Fase 1 — "Esto es un show" (sin arte nuevo) ✅
-
-Hecha. Los bots quedaron calibrados (puntaje medio en 12 carreras): as ≈ 900,
-promedio ≈ 710, torpe ≈ 500; quien cruza en 30 s con una caída saca ≈ 830. El
-sonido usa placeholders sintetizados hasta que lleguen los audios de Flow.
-
-| # | Entregable | Tamaño | Terminado cuando |
+| Piso | Tema | Qué cambia | Para pasarlo |
 |---|---|---|---|
-| 1.1 | Formato episodio: presentación de cada prueba, 3-2-1 con silbato, tabla entre pruebas, podio final | M | Un episodio completo se juega de punta a punta con todas las pantallas |
-| 1.2 | Puente: caer al agua = volver a la última bandera | S | Tests de intención actualizados; ninguna prueba dura menos de 30 s salvo llegando a la meta |
-| 1.3 | Rivales bot de los otros 3 equipos + barra de progreso con 4 puntos | M | Bots con 3 niveles; el mejor gana a veces, ninguno es perfecto |
-| 1.4 | Sonido (SFX, música, público) | M | Cada evento tiene sonido; se puede silenciar |
-| 1.5 | Controles táctiles | S | Se juega entero en el celular en horizontal |
+| 1 | Calentamiento | Escalones anchos y bajos | Nada |
+| 2 | Jabón | 3 de cada 4 escalones resbalan (frenás tarde) | Nada (Agarre ayuda) |
+| 3 | Viento | Ráfagas que empujan para afuera; parado empujan menos (0,45×) | Salto nivel 1 |
+| 4 | Barredoras | Brazos que barren el escalón; si te tocan, volás | Salto nivel 2 |
+| 5 | Burbujas | Una de cada tres es una burbuja que te rebota bien alto | Salto nivel 2 |
+| 6 | Nubes | Escalones que se mueven y te llevan | Salto nivel 2 |
 
-### Fase 2 — "Variedad"
+Las alturas de cada piso están **verificadas con tests**: los pisos 1–2 se suben sin
+mejoras, el 3 pide Salto 1 y del 4 al 6, Salto 2 (con piloto automático sobre la
+simulación real). El límite principal es la energía: al principio alcanza para uno o
+dos pisos.
 
-| # | Entregable | Tamaño | Arte de Flow |
-|---|---|---|---|
-| 2.1 | Baldes al Tanque (simulación, nivel, render, tests, bot) | L | Hoja `props-baldes` (falta) |
-| 2.2 | El Tronco Loco ✅ | L | Hoja `props-tronco` |
-| 2.3 | Puente v2: trampolín, cinta, martillo, cañón, pompas, banderas ✅ | M | Hoja `props-puente-v2` |
+Cornisas: cada 5 escalones hay una cornisa afuera del camino con un regalo. Pisos más
+altos, regalos más raros.
 
-**El Tronco Loco quedó así:** arranca quieto y el primer crujido enseña que cada
-cambio de giro se avisa un segundo antes. Los cañones están a dos alturas: la pelota
-baja se salta; la alta te pasa por arriba si no saltás. Bots calibrados (12
-partidas): as ≈ 820, promedio ≈ 700, torpe ≈ 380. Un jugador perfecto saca ≈ 985.
-Mientras falta Baldes al Tanque, el episodio es Puente → Tronco → Puente.
+## 6. Objetos, rarezas y mutaciones
 
-**El Puente v2 quedó así** (8450 px, por bloques): charco chico con pompa encima →
-rodillo con pompa → trampolín que cruza un charco ancho (pompas en el arco) → cinta
-de goma → dos martillos con un charco en el medio → rodillo que sube y baja con
-pelotas de cañón cruzando → cadena de dos trampolines → cinta + martillo → último
-charco y meta. Reglas que fijan los tests: el trampolín vuela siempre entre ~480 y
-~600 px (aterriza en piso firme o en otro trampolín), nunca hay dos obstáculos que
-empujan a menos de un vuelo de distancia (evita el pinball), hay una bandera cada
-1600 px como mucho y las banderas están lejos de todo lo que empuja. Bots: as ≈ 805,
-promedio ≈ 540, torpe ≈ 390; un jugador que planifica saca ≈ 876 en 21 s.
+14 objetos del programa en 5 rarezas: común (6), raro (25), épico (90), legendario (350)
+y mítico (1500; solo **La Copa Supermatch**, arriba de todo). El valor crece un 25 % por
+piso.
 
-### Fase 3 — "Personajes"
-
-| # | Entregable | Tamaño | Arte de Flow |
-|---|---|---|---|
-| 3.1 | Presentador/a y árbitro ✅ | M | Hoja de cada uno + boca abierta/cerrada |
-| 3.2 | Concursante animado por clips de video | L | Clips ya pedidos (correr, patinar, golpe…) |
-| 3.3 | 4 concursantes elegibles / disfraces | L | Hojas de personaje + clips |
-
-### Fase 4 — "Que vuelvan todos los días"
-
-| # | Entregable | Tamaño |
+| Mutación | Chance | Multiplica |
 |---|---|---|
-| 4.1 | Episodio del día: semilla + pruebas del día servidas por la base | M |
-| 4.2 | Comodín ×2 | S |
-| 4.3 | Repetición de la mejor caída + compartir | M |
-| 4.4 | Fantasmas reales: la mejor partida del día de cada equipo como rival | M |
-| 4.5 | Analítica de caídas + validación por re-simulación en el servidor (anti-trampa) | M |
+| Mojado | 20 % | ×1,5 |
+| Dorado | 3 % | ×5 |
+| Arcoíris | 0,4 % | ×20 |
 
-**En paralelo:** mientras se programa una fase, se genera en Flow el arte de la
-siguiente. Los prompts están en `docs/ART_DIRECTION.md`.
+La **colección** (álbum) muestra los encontrados, con insignias de mutación; los que
+faltan aparecen como "???".
 
-## 11. Riesgos y decisiones
+## 7. El kiosco
 
-| Riesgo | Mitigación |
-|---|---|
-| Que las pruebas nuevas no sean divertidas | Prototipo con formas simples primero, jugarlo, y recién después el arte |
-| Controles en el celular | Tres botones grandes en todas las pruebas, el mismo esquema |
-| El arte de IA sale inconsistente | Siempre usar la hoja de referencia del personaje como imagen de inicio |
-| El nombre "Supermatch" | Consultarlo antes de un lanzamiento comercial |
-| Trampas en el ranking | Topes por prueba hoy; re-simulación del input en el servidor (4.5) |
+Precio de cada nivel: `base × crecimiento^nivel`.
 
-## 12. Por qué todavía se siente básico, y cómo seguir
+| Mejora | Efecto | Base | Crec. | Máx. |
+|---|---|---|---|---|
+| Energía | +8 por nivel (empieza en 30) | 15 | 1,55 | 15 |
+| Salto | +0,45 m/s de impulso por nivel | 25 | 1,7 | 8 |
+| Mochila | +2 lugares (empieza en 3) | 20 | 1,6 | 8 |
+| Agarre | Menos resbalón en jabón y viento | 40 | 1,9 | 3 |
+| Imán | +0,6 m de radio para agarrar | 60 | 2 | 4 |
+| Ascensor | Arrancás en el descanso más alto | 250 | — | 1 |
+| Flotador | Manteniendo el salto, caés despacito | 300 | — | 1 |
+| Doble salto | Un segundo salto en el aire | 400 | — | 1 |
 
-Diagnóstico después de la Fase 1, el Tronco y el Puente v2:
+## 8. Controles
 
-| Qué falta | Por qué pesa | Cómo se resuelve |
-|---|---|---|
-| **Sonido de verdad** | Los efectos y la música son sintetizados: suenan a demo. Es lo que más "abarata" | Audios de Flow (prompts listos) + voces del presentador |
-| **Personaje con más vida** | El títere de cartón tiene pocas poses | Clips de video de Flow por estado (Fase 3.2), más expresiones, ropa que se mueve |
-| **Momentos para mostrar** | Lo más gracioso (una caída) pasa y se va | Repetición de la mejor caída en cámara lenta al final del episodio, para compartir |
-| **Motivo para volver** | Cada partida es igual | Episodio del día, récords personales, medallas por prueba, comodín ×2 |
-| **Variedad** | Dos pruebas | Baldes al Tanque y después Justa en la Pileta |
+- **Teclado:** WASD o flechas para caminar (relativo a la cámara), Espacio para saltar
+  (mantenerlo = flotador), E o Enter en el kiosco, Escape cierra paneles.
+- **Táctil:** joystick a la izquierda, botón de salto a la derecha.
+- **Cámara:** sigue al jugador desde afuera de la torre; arrastrando se gira. En
+  pantallas angostas se abre el lente y se aleja.
+- Coyote time (0,1 s) y salto anticipado (0,12 s) para que el control perdone.
 
-### Hecho en la pasada de "juice" y show
+## 9. Show y sensación
 
-- Congelado de impacto en cada golpe y cámara lenta al caer al agua y al llegar.
-- Cámara que sigue en altura (trampolines), se aleja al volar y da un golpe de zoom en
-  los impactos; líneas de velocidad a fondo sobre el jabón.
-- Hinchada de los 4 equipos en primer plano que salta con cada caída; luces que
-  barren el estudio; cartel "EN VIVO".
-- Tu puesto en vivo ("2º") y avisos de adelantamiento ("¡PASASTE A AZUL!").
-- Brazos en molino al patinar sin control, festejo al ganar y reaparición cayendo
-  desde arriba de la bandera.
+- Presentador con frases por piso, récord, mochila llena, sin nafta, la cima.
+- Carteles 3D que flotan ("¡PLAF!", "+3", "¡PUM!", "¡BOING!", nombre del objeto).
+- Partículas: salpicón, confeti, estrellas; aplastamiento al aterrizar.
+- Sonidos: salto, aterrizaje, rebote, golpe, ficha, objeto, cascada de "¡PLAF!" y risas.
 
-### Hecho en la pasada de fluidez
+## 10. Plan
 
-- Rodillas y codos: piernas y brazos se dibujan en dos tramos (misma pieza cortada),
-  con articulación redonda que tapa la costura.
-- La zancada crece y se apaga con la velocidad (antes el personaje quedaba congelado
-  a mitad de paso), el cuerpo sube y baja al correr y respira quieto.
-- En el aire recoge las rodillas al subir y las estira al bajar; al aterrizar se agacha.
-- El jugador se dibuja entre dos pasos de la simulación: sin saltitos en pantallas de
-  90 o 144 Hz.
-- Los carteles del programa entran con un rebotito y las filas de la tabla de a una;
-  el puntaje de la ronda en equipo cuenta para arriba.
+### Fase 1 — La Torre jugable ✅
+Simulación con tests, torre de 6 pisos, progresión y kiosco, colección, render 3D toon,
+HUD, controles de teclado y táctiles. El progreso se guarda en el navegador.
 
-### Orden propuesto
+### Fase 2 — Que sume para el equipo
+- Guardar el progreso en Supabase (perfil anónimo) y no solo en el navegador.
+- La fama cobrada suma a la Misión del día y al ranking de tu color (RPC con topes de
+  plausibilidad, como `finish_run`).
+- Personaje 3D de verdad (modelo + animaciones, ver `ART_DIRECTION.md`).
 
-1. **Audios de Flow** (efectos, música, voces del presentador): el mayor salto de
-   calidad por esfuerzo. Solo necesita los videos.
-2. **Repetición de la mejor caída** al final del episodio (la simulación es
-   determinista: se graba el input y se vuelve a jugar en cámara lenta). M.
-3. **Baldes al Tanque**, la tercera prueba. L.
-4. **Medallas y récords** (bronce, plata, oro por prueba) y episodio del día. M.
-5. **Clips del concursante** (correr, patinar, golpe, festejo) en lugar del títere. L.
+### Fase 3 — Que vuelvan todos los días
+- **Eventos en vivo:** "hora del jabón doble", "lluvia de patitos dorados", viento loco.
+- **Mascotas** que siguen al concursante y dan bonus (más imán, menos gasto).
+- **Ver a otros** subiendo en tiempo real (presencia por Supabase Realtime).
 
+### Fase 4 — Temporadas
+- **Renacer** ("nueva temporada"): reiniciás mejoras a cambio de un multiplicador de
+  fama permanente y cosméticos.
+- Más pisos y el misterio de arriba de la Copa ("¿?").
 
-## 13. Modos de juego
+## 11. Riesgos
 
-Después de elegir equipo, la portada ofrece tres formas de jugar el mismo episodio
-de 3 pruebas, y una meta compartida:
-
-| Modo | Qué es | Para quién |
-|---|---|---|
-| **En equipo** | El Colchón: los 4 juntos (con la compu, online o con amigos), ver §14 | Colaborar de verdad, en la misma pista |
-| **Jugar solo** | Vos contra 3 bots (uno de cada otro color, con niveles mezclados en cada prueba) | Para jugar ya, sin esperar a nadie |
-| **Carrera online** | En vivo contra hasta 3 personas al azar; si faltan, completan bots | La emoción de ganarle a alguien real |
-| **Con amigos** | Sala con código o link; el anfitrión arranca y puede pedir revancha | Juntadas, grupos de WhatsApp |
-| **Misión del equipo** | Meta del día para todos los de un color (10.000 puntos). Cada partida suma, en cualquier modo | Colaborar con desconocidos de tu facción |
-
-**Decisiones de diseño**
-
-- Online se ven todos en la misma pista (semitransparentes, con su apodo arriba) y
-  los avisos nombran a las personas: "¡TE PASÓ PATO RESBALOSO!".
-- No hay botón "¡A JUGAR!": la sala marca la hora y todos largan juntos. La tabla
-  entre pruebas espera a que lleguen todos ("jugando…").
-- Tu puntaje suma a tu equipo igual que solo: no hay que elegir entre jugar con
-  amigos o ayudar a tu color.
-- Dos personas del mismo color pueden competir entre sí; los bots siempre toman
-  colores libres.
-
-**Lo que sigue (online)**
-
-1. Más pruebas en equipo sobre el mismo motor (rollback): *Baldes al Tanque* por
-   parejas (uno carga, otro estabiliza), *La Escalera* (dos sostienen, uno sube).
-2. Reacciones rápidas en la tabla (😂 👏 💦) para hablar sin chat.
-3. Revancha automática: si todos vuelven a la sala, arranca sola.
-
-## 14. El Colchón (en equipo)
-
-**Idea:** como el Game & Watch *Fire*, pero en un programa de agua y entre cuatro.
-Desde una torre se tiran concursantes; dos colchones inflables, cada uno llevado por
-dos portadores sobre una pasarela flotante, los hacen rebotar de colchón en colchón
-hasta el pelotero. El que no se ataja, al agua.
-
-**Por qué es cooperativo de verdad:**
-
-- **Llevar entre dos:** los portadores de un colchón no se pueden alejar ni juntar
-  de más. Si uno tira para un lado y el otro para el otro, no se mueven (tironeo);
-  si uno va y el otro no, lo arrastra a medias.
-- **Súper rebote:** si los dos saltan juntos (menos de 0,18 s de diferencia) justo
-  cuando cae alguien, sale con súper rebote. Desde el primer colchón llega **directo**
-  al pelotero (bonus). Un anillo que se cierra sobre el colchón marca el momento
-  (verde = ¡ya!).
-- **Posta:** el primer colchón le pasa al segundo. Dónde cae sobre el colchón y la
-  inclinación (si uno saltó o está tirado) cambian hacia dónde sale: el otro par
-  tiene que leerlo y moverse.
-
-**Las 3 rondas (minipruebas), una por prueba del episodio:**
-
-| Ronda | Nombre | Vuelta de tuerca |
-|---|---|---|
-| 1 | ¡Atajalos! | Uno por vez, para aprender a atajar y a saltar juntos |
-| 2 | Lluvia de globos | Globos de agua: en el colchón lo empapan (los dos van más lentos 1,3 s); en la cabeza, tiran al portador. Más saltadores, a veces de a dos, y dorados que valen más |
-| 3 | La barrera | Rodillos que cruzan la pasarela: hay que saltarlos sin soltar el colchón (el que se cae suelta su punta y el colchón se inclina). Charcos de jabón: cuesta frenar |
-
-**Puntaje (de los 4, tope 1000 por ronda):** rebote 5, súper rebote 15, llegada 35
-(+40 dorado, +15 directo) y racha +5 por llegada seguida (hasta +15). Medallas por
-ronda: bronce 350, plata 550, oro 750. Calibración (4 bots, 8 semillas): ronda 1 ≈ 615,
-ronda 2 ≈ 840, ronda 3 ≈ 710; sin que nadie se mueva, ≈ 200–270.
-
-**Bots compañeros:** calculan dónde va a caer el próximo (sin trigonometría, igual en
-todas las compus), se acomodan con un poco de error y de reacción, deciden una vez por
-saltador si bombean para el súper rebote (55 %) y saltan los rodillos casi siempre.
-Si tu compañero es un bot, salta en el momento justo: seguile el ritmo.
+- **Rendimiento en celulares viejos:** sombras de una sola luz, pixel ratio tope 1,75,
+  geometría instanciada. Si hace falta, se apagan sombras y contornos.
+- **Trampas:** todo lo que calcula el cliente se puede falsificar. Mientras el progreso
+  sea local no importa; cuando sume al equipo (fase 2) va con topes en el servidor.
+- **Que se sienta repetitivo:** por eso los pisos cambian de tema, las rarezas y
+  mutaciones, y los eventos de la fase 3.

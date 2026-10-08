@@ -18,7 +18,7 @@ export default function Home() {
           />
         </h1>
         <p className="mx-auto mt-4 max-w-md text-lg text-foreground/80">
-          Minijuegos torpes, resbaladizos y caóticos. Elegí tu equipo: no hay vuelta atrás.
+          Una torre inflable, enjabonada y gigante. Cada caída a la pileta te hace más fuerte. Elegí tu equipo: no hay vuelta atrás.
         </p>
       </div>
       <div className="flex flex-col items-center gap-8 md:flex-row md:gap-14">

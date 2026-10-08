@@ -14,48 +14,17 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
   ]),
 
-  // Fronteras React ⇄ KAPLAY (ver docs/ARCHITECTURE.md)
+  // La simulación de La Torre es TypeScript puro (ver docs/ARCHITECTURE.md).
   {
-    files: ["src/game/**/*.{ts,tsx}"],
+    files: ["src/tower/sim/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
         {
           patterns: [
             {
-              group: [
-                "react",
-                "react/*",
-                "react-dom",
-                "react-dom/*",
-                "next",
-                "next/*",
-                "zustand",
-                "zustand/*",
-                "@supabase/*",
-                "@/*",
-                "!@/game",
-                "!@/game/**",
-              ],
-              message:
-                "game/ es TypeScript puro: se comunica con la UI solo a través de game/contract.ts.",
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/game/**", "src/bridge/**"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["kaplay", "kaplay/*", "@/game", "@/game/**"],
-              message: "Solo bridge/ habla con el motor: importá desde @/bridge/*.",
+              group: ["react", "react/*", "react-dom", "next", "next/*", "three", "three/*", "@react-three/*", "zustand", "zustand/*", "@supabase/*", "@/*", "../*"],
+              message: "tower/sim/ es TypeScript puro y determinista: no conoce React, three, el store ni la base.",
             },
           ],
         },

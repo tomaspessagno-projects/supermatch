@@ -1,4 +1,3 @@
-import type { MinigameResult } from "@/bridge/events";
 import { randomNickname } from "@/lib/nicknames";
 import type { TeamId } from "@/lib/teams";
 import { supabase } from "./client";
@@ -43,28 +42,6 @@ export async function joinTeam(team: TeamId): Promise<Profile> {
   const existing = await loadProfile();
   if (!existing) throw error;
   return existing;
-}
-
-/** Abre un run en el servidor (que fija la hora de inicio). */
-export async function startRun(): Promise<string> {
-  const { data, error } = await supabase().rpc("start_run");
-  if (error) throw error;
-  return data;
-}
-
-/** Cierra el run: el servidor valida los resultados y suma al equipo. */
-export async function finishRun(runId: string, results: readonly MinigameResult[]): Promise<number> {
-  const { data, error } = await supabase().rpc("finish_run", {
-    p_run_id: runId,
-    p_results: results.map((r) => ({
-      slot: r.slot,
-      minigame_id: r.minigameId,
-      score: r.score,
-      duration_ms: r.durationMs,
-    })),
-  });
-  if (error) throw error;
-  return data;
 }
 
 type TeamTotalRow = { team_id: string; total_score: number; runs_count: number };
