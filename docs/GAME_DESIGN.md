@@ -84,7 +84,8 @@ corona) · 21. Temporada nueva (*Leyenda*, 🌈 estela arcoíris) · 22. Las 24 
 ### Misiones del día
 
 Salen de una lista (5 intentos, 40 fichas, 3 regalos, 20 m, 3 súper rebotes, 2 redes,
-"que te tiren 3 veces", 500 de fama, 2 géiseres, una estrella). La fecha elige 3, así
+"que te tiren 3 veces", 500 de fama, 2 géiseres, una estrella, subirse 5 veces
+colgándose de un borde). La fecha elige 3, así
 que son las mismas para todos ese día.
 
 ### Estrellas doradas
@@ -158,10 +159,29 @@ es la **cima**, con la Copa.
 | 7 | Géiseres y burbujas | 15 m | Chorros que salen cada 3 s y te suben; burbujas que rebotan | Salto nivel 2 |
 | 8 | Nubes y calesitas | 12 m | Nubes que te llevan, calesitas que giran, plataformas que titilan y desaparecen | Salto nivel 2 |
 
-Todo está **verificado con tests** (piloto automático sobre la simulación real): los
-pisos 1 a 4 se suben sin mejoras, el 5 pide Salto 1 y del 6 al 8, Salto 2; ningún bloque
-hace de techo sobre el camino y ninguno se pisa con otro. El límite principal es la
-energía: al principio alcanza para un piso y algo.
+Todo está **verificado con tests** (piloto automático sobre la simulación real): con
+saltos limpios, los pisos 1 a 4 se suben sin mejoras, el 5 pide Salto 1 y del 6 al 8,
+Salto 2; ningún bloque hace de techo sobre el camino y ninguno se pisa con otro. El
+límite principal es la energía: al principio alcanza para un piso y algo.
+
+### Agarrarse del borde
+
+Si un salto se queda corto, el concursante **se agarra del borde** y queda colgado:
+
+- Se agarra cayendo (o en lo más alto del salto) con las manos a la altura del borde de
+  un bloque que tiene al lado. No se agarra si venía tirándose para afuera (más de
+  3 m/s), si cae de muy alto (más de 13 m/s: se va de largo a la pileta) o sin energía.
+- Colgado: **de costado** avanza por el borde; **saltar** (o empujar hacia el bloque
+  un instante) lo sube arriba; **para atrás** se suelta.
+- Colgado se gasta energía como trepando, y se aguanta 2,5 s (+1,2 s por nivel de
+  **Agarre**). Subirse cuesta 3 de energía (un salto cuesta 1).
+- De lo redondo, lo que rebota y lo que gira (bolas, camas, burbujas, calesitas, nubes)
+  no hay de dónde agarrarse; la que titila te suelta al apagarse y un golpe también.
+
+Con esto los escalones altos se pueden subir sin mejoras (los tests lo verifican en los
+pisos 5 a 7), así que **Salto pasa a ser una mejora de ahorro**: subir limpio cuesta
+menos energía y tiempo. En el piso 8 (nubes y calesitas) no hay bordes donde colgarse:
+ahí el salto sigue mandando.
 
 Cornisas: cada 5 pasos, cerca del medio de la fachada, una cornisa en el otro carril con
 un regalo. Pisos más altos, regalos más raros.
@@ -195,7 +215,7 @@ Precio de cada nivel: `base × crecimiento^nivel`.
 | Energía | +10 por nivel (empieza en 40) | 15 | 1,55 | 15 |
 | Salto | +0,45 m/s de impulso por nivel | 25 | 1,7 | 8 |
 | Mochila | +2 lugares (empieza en 3) | 20 | 1,6 | 8 |
-| Agarre | Menos resbalón en jabón, bolas y viento | 40 | 1,9 | 3 |
+| Agarre | Menos resbalón en jabón, bolas y viento; +1,2 s colgado | 40 | 1,9 | 3 |
 | Imán | +0,6 m de radio para agarrar | 60 | 2 | 4 |
 | Ascensor | Arrancás en el descanso más alto | 250 | — | 1 |
 | Flotador | Manteniendo el salto, caés despacito | 300 | — | 1 |
@@ -239,7 +259,8 @@ suena el silbato y el presentador lo anuncia.
 ## 10. Controles
 
 - **Teclado:** flechas o WASD. Izquierda/derecha para ir de costado; adelante es hacia
-  la torre (y en las redes, trepar); atrás, hacia la pileta. Espacio para saltar
+  la torre (y en las redes, trepar; colgado, subirse); atrás, hacia la pileta (colgado,
+  soltarse). Espacio para saltar
   (mantenerlo = flotador; al caer en una cama elástica = súper rebote). E o Enter en el
   kiosco, Escape cierra paneles.
 - **Táctil:** joystick a la izquierda, botón de salto a la derecha.
@@ -254,7 +275,13 @@ suena el silbato y el presentador lo anuncia.
   llena, sin nafta, la cima y los eventos en vivo.
 - Carteles 3D que flotan ("¡PLAF!", "+3", "¡BOING!", "¡SÚPER BOING!", "¡PIÑA!",
   "¡TOING!", "¡PAF!", "¡FSSS!", "¡FIUUU!", nombre del objeto).
-- Partículas: salpicón, confeti, estrellas, espuma; aplastamiento al aterrizar.
+- Partículas: salpicón, confeti, estrellas, espuma, polvito al correr y al agarrarse.
+- Animación (docs/ARCHITECTURE.md): 17 animaciones que se mezclan sin saltos (correr con
+  braceo y contra-giro del torso, inclinarse en las curvas, salto con rodilla recogida,
+  mortal en el doble salto, colgarse, avanzar por el borde, subirse, tambalearse en la
+  punta, festejar, patalear cayendo de muy alto). Se aplasta al caer (más cuanto más
+  fuerte) y se estira al saltar; parpadea, mira para los costados, las cintas de la
+  vincha flamean y la cara cambia (cejas, ojos, boca) según lo que pasa.
 - Sonidos: salto, aterrizaje, rebote, golpe, cañonazo, crujido al desinflarse, ficha,
   objeto, silbato de evento, "¡PLAF!" y risas.
 

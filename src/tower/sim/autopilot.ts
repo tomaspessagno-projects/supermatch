@@ -18,8 +18,12 @@ export function stepBox(tower: Tower, s: PathStep, t: number): Box {
 
 const center = (b: Box) => ({ x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 });
 
-/** ¿Llega de `from` a `to`? Arranca parado en el centro de `from` (en el tiempo `t0`). */
-export function hop(tower: Tower, stats: Stats, from: PathStep, to: PathStep, t0 = 0): boolean {
+/**
+ * ¿Llega de `from` a `to`? Arranca parado en el centro de `from` (en el tiempo `t0`).
+ * Sin `ledges` mide el salto limpio: agarrarse de un borde cuenta como no llegar.
+ * Con `ledges`, si se agarra, se sube.
+ */
+export function hop(tower: Tower, stats: Stats, from: PathStep, to: PathStep, t0 = 0, { ledges = false } = {}): boolean {
   const fromKind = from.kind === "block" ? blockOf(tower, from.id)!.kind : "cloud";
   const toKind = to.kind === "block" ? blockOf(tower, to.id)!.kind : "cloud";
   const w: World = createWorld(tower, stats, { record: 0, highestRest: -1 });
@@ -71,8 +75,15 @@ export function hop(tower: Tower, stats: Stats, from: PathStep, to: PathStep, t0
       doubled = true;
     }
     if (stats.float && jumped && p.vy < 0 && p.y > target.maxY) input.jumpHeld = true;
-    step(w, input, DT);
+    // Colgado: para arriba (empujando hacia el bloque).
+    if (p.hang) {
+      const into = p.hang.axis === "x" ? -p.hang.side : 0;
+      const intoZ = p.hang.axis === "z" ? -p.hang.side : 0;
+      Object.assign(input, { moveX: into, moveZ: intoZ, jumpPressed: false, jumpHeld: false });
+    }
+    const events = step(w, input, DT);
     if (w.phase === "splash") return false;
+    if (!ledges && events.some((e) => e.type === "grab")) return false;
     const on =
       w.player.grounded && Math.abs(w.player.y - target.maxY) < 0.05 &&
       w.player.x > target.minX - 0.4 && w.player.x < target.maxX + 0.4 && w.player.z > target.minZ - 0.4 && w.player.z < target.maxZ + 0.4;

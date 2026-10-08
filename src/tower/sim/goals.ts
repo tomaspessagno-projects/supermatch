@@ -39,6 +39,8 @@ export type Counter =
   | "geysers"
   /** Veces que te tiró algo. */
   | "knocks"
+  /** Veces que te subiste a un bloque colgándote del borde. */
+  | "pullUps"
   | "pets"
   /** Veces que llegaste a la cima. */
   | "tops"
@@ -49,7 +51,7 @@ export type Counters = Record<Counter, number>;
 
 export const NO_COUNTERS: Counters = {
   height: 0, rest: 0, runs: 0, upgrades: 0, chipsRun: 0, fameRun: 0, chips: 0, fame: 0, items: 0, mutated: 0,
-  superBounces: 0, nets: 0, geysers: 0, knocks: 0, pets: 0, tops: 0, seasons: 0, stars: 0,
+  superBounces: 0, nets: 0, geysers: 0, knocks: 0, pullUps: 0, pets: 0, tops: 0, seasons: 0, stars: 0,
 };
 
 /** Los que guardan un máximo (o un valor actual); el resto se van sumando. */
@@ -108,6 +110,7 @@ export const DAILY_POOL: readonly Mission[] = [
   { id: "d-fame", text: "Cobrá 500 de fama", counter: "fame", goal: 500, reward: { fame: 150 } },
   { id: "d-geysers", text: "Volá en 2 géiseres", counter: "geysers", goal: 2, reward: { fame: 150 } },
   { id: "d-star", text: "Encontrá una estrella dorada", counter: "stars", goal: 1, reward: { fame: 120 } },
+  { id: "d-ledges", text: "Subite 5 veces colgándote de un borde", counter: "pullUps", goal: 5, reward: { fame: 100 } },
 ];
 
 /** El día del programa (Argentina, UTC-3), como "2026-10-08". */

@@ -10,7 +10,7 @@ const calm = calmTower(tower);
 const pathBlocks = tower.path.filter((s) => s.kind === "block").map((s) => blockOf(tower, s.id)!);
 
 /** ¿Se puede subir cada paso de estos pisos con este nivel de salto? */
-function climbable(floors: number[], jump: number) {
+function climbable(floors: number[], jump: number, ledges = false) {
   const stats = statsFor({ ...NO_UPGRADES, jump });
   let ok = 0;
   let total = 0;
@@ -19,7 +19,7 @@ function climbable(floors: number[], jump: number) {
     if (!floors.includes(to.floor)) continue;
     total++;
     // Con lo que se mueve o parpadea se puede esperar el momento: alcanza con que salga en alguno.
-    if ([0, 0.7, 1.4, 2.1].some((t0) => hop(calm, stats, calm.path[i], to, t0))) ok++;
+    if ([0, 0.7, 1.4, 2.1].some((t0) => hop(calm, stats, calm.path[i], to, t0, { ledges }))) ok++;
   }
   return { ok, total };
 }
@@ -53,6 +53,14 @@ describe("la torre", () => {
     const top2 = climbable([5, 6, 7], 2);
     expect(top1.ok).toBeLessThan(top1.total);
     expect(top2.ok).toBe(top2.total);
+  }, 120_000);
+
+  it("colgándose del borde se sube sin mejoras (saltar más alto ahorra), salvo en las nubes y calesitas", () => {
+    const middle = climbable([4, 5, 6], 0, true);
+    expect(middle.ok).toBe(middle.total);
+    // De las nubes y las calesitas no hay de dónde colgarse: arriba de todo, el salto sigue mandando.
+    const sky = climbable([7], 0, true);
+    expect(sky.ok).toBeLessThan(sky.total);
   }, 120_000);
 
   it("no hay caracol: el camino sube por delante de la fachada, de costado a costado", () => {

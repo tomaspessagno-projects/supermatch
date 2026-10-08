@@ -18,9 +18,12 @@ martillos, guantes, cañones, géiseres, nubes, calesitas, mascotas, regalos), s
 
 ### Pedido: el concursante en 3D
 
-Hoy el concursante es un muñeco procedural (cajas y esferas articuladas por código).
-Para que se vea como un juego de verdad hace falta un modelo 3D con animaciones. Se
-genera con una cuenta propia, sin programar:
+Hoy el concursante es un muñeco hecho por código (`src/tower/view/character/`):
+piezas articuladas (cadera, columna, cabeza, codos, rodillas, tobillos), cara con
+cejas, pupilas que miran, parpadeo y boca, y 17 animaciones que se mezclan entre sí
+(ver docs/ARCHITECTURE.md). El juego **ya sabe cargar un modelo 3D con esqueleto**
+(GLB): cuando llega, se cambia una línea y el resto no se toca. Se genera con una
+cuenta propia, sin programar:
 
 1. **Modelo:** en **Tripo** (tripo3d.ai) o **Meshy** (meshy.ai), *Image to 3D* con
    `art/source/ref-personaje.jpg` (vincha, remera blanca, short, zapatillas). Estilo
@@ -29,30 +32,39 @@ genera con una cuenta propia, sin programar:
      head, white t-shirt, white shorts, red sneakers, sweatband, clean simple shapes,
      T-pose, full body, game-ready low poly"*.
    - Límite: unos **10.000–20.000 triángulos** y **una textura de 1024 px**.
-   - Ideal: la **remera en un material aparte** (blanca), así el juego la tiñe con el
-     color del equipo.
+   - Ideal: la **remera en un material aparte llamado `shirt`** (blanca), así el juego
+     la tiñe con el color del equipo.
 2. **Esqueleto:** el auto-rig de Tripo/Meshy, o subir el modelo a **Mixamo**
    (mixamo.com, gratis con cuenta de Adobe) y usar su auto-rigger.
-3. **Animaciones** (Mixamo, *In Place* tildado, 30 fps):
+3. **Animaciones** (Mixamo, *In Place* tildado cuando aparece, 30 fps). El nombre del
+   clip puede ser el nuestro o el de Mixamo (el juego reconoce los dos); las que falten
+   se reemplazan por la más parecida, así que con las 5 primeras ya funciona:
 
-   | Nombre del clip | Mixamo sugerido | Uso |
+   | Clip | Mixamo sugerido | Uso |
    |---|---|---|
    | `idle` | Breathing Idle / Happy Idle | Parado |
-   | `run` | Running (in place) | Caminar y correr |
+   | `run` | Running (in place) | Caminar y correr (se acelera con la velocidad) |
    | `jump` | Jumping Up | Despegue |
    | `fall` | Falling Idle | En el aire bajando |
-   | `land` | Falling To Landing | Aterrizaje |
-   | `slip` | Slipping / Stumble Backwards | Sin energía, resbalón |
-   | `hit` | Hit Reaction / Flying Back Death | Golpe de barredora |
+   | `hang` | Hanging Idle | **Colgado del borde** |
+   | `shimmy` | Braced Hang Shimmy | Avanzar colgado por el borde |
+   | `pullup` | Braced Hang To Crouch | Subirse al borde (la simulación maneja el tiempo) |
+   | `climb` | Climbing Ladder | Trepar la red |
+   | `teeter` | Losing Balance | En la punta de un bloque, a punto de caerse |
+   | `flip` | Front Flip | Doble salto |
+   | `glide` | Floating | Con el flotador |
+   | `slip` | Stumble / Tired | Sin energía, resbalón |
+   | `hit` | Hit Reaction / Flying Back Death | Golpe (martillo, guante, cañón) |
    | `swim` | Treading Water | En la pileta |
-   | `cheer` | Victory / Celebrating | La cima y los récords |
+   | `cheer` | Victory / Celebrating | La cima, estrellas, regalos y récords |
 
-4. **Exportar** como **GLB** (o FBX con piel; se convierte a GLB) y subirlo a
-   `art/source/3d/concursante.glb` (o mandarlo por el chat). Si las animaciones vienen
-   en archivos separados, también sirven.
+4. **Exportar** como **GLB** con todas las animaciones adentro (en Blender: importar
+   los FBX de Mixamo, ponerle a cada acción el nombre de la tabla y exportar glTF
+   binario) y subirlo a `public/game/models/concursante.glb` (o mandarlo por el chat).
 
-El juego ya tiene los estados para cada clip; cuando llegue el GLB se reemplaza el
-muñeco procedural con `useGLTF` + `useAnimations` de drei.
+**Probarlo sin tocar código:** `/torre?modelo=/game/models/concursante.glb` (y
+`&zoom=0.4` para ver de cerca). **Dejarlo fijo:** `CHARACTER_MODEL` en
+`src/tower/view/Player.tsx`. Si el archivo falla, el juego vuelve solo al muñeco.
 
 ### Más adelante (opcionales)
 

@@ -77,7 +77,22 @@ export type Player = {
   netCooldown: number;
   /** Lo está subiendo un géiser. */
   lifted: boolean;
+  /** Colgado del borde de un bloque (null si no). */
+  hang: Hang | null;
+  /** Subiéndose al borde desde colgado (null si no). */
+  pullUp: PullUp | null;
+  /** Después de soltarse, un ratito sin volver a agarrarse. */
+  grabCooldown: number;
 };
+
+/**
+ * Colgado de un borde: de qué bloque y de qué cara. `axis`/`side` dicen qué cara:
+ * x -1 es la de minX (el jugador queda a la izquierda, mirando hacia +x), z +1 la
+ * de maxZ (queda del lado de la cámara, mirando a la pared), etc.
+ */
+export type Hang = { block: number; axis: "x" | "z"; side: 1 | -1; time: number };
+/** Subida al borde: de dónde a dónde, y cuánto va (0 a 1). */
+export type PullUp = { block: number; t: number; from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } };
 
 export type Content = { kind: "chip"; value: number } | { kind: "item"; item: Item };
 
@@ -147,6 +162,9 @@ export type SimEvent =
   | { type: "deflate"; x: number; y: number; z: number }
   | { type: "climb" }
   | { type: "mantle" }
+  | { type: "grab" }
+  | { type: "pullUp" }
+  | { type: "letGo"; tired: boolean }
   | { type: "lift" }
   | { type: "chip"; value: number; x: number; y: number; z: number }
   | { type: "star"; id: number; floor: number; x: number; y: number; z: number }
@@ -224,6 +242,9 @@ function newPlayer(x: number, y: number, z: number): Player {
     climbing: false,
     netCooldown: 0,
     lifted: false,
+    hang: null,
+    pullUp: null,
+    grabCooldown: 0,
   };
 }
 
@@ -256,18 +277,24 @@ export function step(w: World, rawInput: PlayerInput, dt: number): SimEvent[] {
   const input = p.stun > 0 || p.slipping ? IDLE : rawInput;
   p.stun = Math.max(0, p.stun - dt);
   p.netCooldown = Math.max(0, p.netCooldown - dt);
+  p.grabCooldown = Math.max(0, p.grabCooldown - dt);
   stepEnergy(w, dt, events);
-  climb(w, input, events);
-  if (!p.climbing) moveHorizontal(w, input, dt);
-  jumpAndGravity(w, input, dt, events);
-  geysers(w, events);
-  integrate(w, dt, events);
+  if (p.pullUp) pullUpStep(w, dt, events);
+  else if (p.hang) hangStep(w, input, dt, events);
+  else {
+    climb(w, input, events);
+    if (!p.climbing) moveHorizontal(w, input, dt);
+    jumpAndGravity(w, input, dt, events);
+    geysers(w, events);
+    integrate(w, dt, events);
+    tryGrab(w, events);
+  }
   crumble(w, events);
   hazards(w, events);
   pickUp(w, events);
   checkPlaces(w, events);
 
-  if (!p.climbing && Math.abs(p.vx) + Math.abs(p.vz) > 0.5) p.facing = Math.atan2(p.vx, p.vz);
+  if (!p.climbing && !p.hang && !p.pullUp && Math.abs(p.vx) + Math.abs(p.vz) > 0.5) p.facing = Math.atan2(p.vx, p.vz);
   if (p.y < TUNING.waterY) splash(w, events);
   return events;
 }
@@ -278,7 +305,7 @@ function stepEnergy(w: World, dt: number, events: SimEvent[]) {
   const p = w.player;
   // En la orilla y en los descansos no se gasta.
   if (!p.safe && w.energy > 0) {
-    const drain = (TUNING.drainPerSecond + (p.climbing ? TUNING.climbDrain : 0)) * w.stats.drainMult;
+    const drain = (TUNING.drainPerSecond + (p.climbing || p.hang ? TUNING.climbDrain : 0)) * w.stats.drainMult;
     w.energy = Math.max(0, w.energy - drain * dt);
     if (w.energy === 0) events.push({ type: "exhausted" });
   }
@@ -291,6 +318,7 @@ function stepEnergy(w: World, dt: number, events: SimEvent[]) {
   if (!p.slipping && p.exhausted >= TUNING.exhaustedFor) {
     p.slipping = true;
     p.climbing = false;
+    if (p.hang) letGo(w, events, true);
     events.push({ type: "slip" });
   }
 }
@@ -574,6 +602,156 @@ function integrate(w: World, dt: number, events: SimEvent[]) {
   }
 }
 
+/** Lo que se puede agarrar del borde (lo redondo, lo que rebota y lo que gira, no). */
+const GRABBABLE: readonly BlockKind[] = ["normal", "soap", "conveyor", "crumble", "blink", "ledge", "rest", "goal", "pillar"];
+
+/** Dónde queda el jugador colgado de esa cara (pegado a la pared del bloque). */
+function hangSpot(b: Block, axis: "x" | "z", side: 1 | -1, along: number) {
+  const r = TUNING.playerRadius;
+  const y = b.maxY - TUNING.hangReach;
+  if (axis === "x") return { x: side < 0 ? b.minX - r : b.maxX + r, y, z: along };
+  return { x: along, y, z: side < 0 ? b.minZ - r : b.maxZ + r };
+}
+
+/** ¿Hay lugar para el cuerpo ahí (sin contar el bloque del que te colgás)? */
+function roomFor(w: World, x: number, y: number, z: number, except: number, h = TUNING.playerHeight) {
+  const r = TUNING.playerRadius - 0.05;
+  for (const b of w.tower.blocks) {
+    if (b.id === except || !solidNow(w, b) || b.kind === "elevator") continue;
+    if (x + r > b.minX && x - r < b.maxX && y + h > b.minY && y < b.maxY && z + r > b.minZ && z - r < b.maxZ) return false;
+  }
+  return true;
+}
+
+/**
+ * Agarrarse del borde: cayendo (o en lo más alto del salto) con las manos a la
+ * altura del borde de un bloque que tenés al lado. Si venías muy rápido para
+ * afuera (tirándote a propósito, o resbalando en el jabón), no te agarrás.
+ */
+function tryGrab(w: World, events: SimEvent[]) {
+  const p = w.player;
+  if (p.grounded || p.climbing || p.stun > 0 || p.slipping || p.lifted || p.grabCooldown > 0 || w.energy <= 0) return;
+  if (p.vy > 0.5 || p.vy < -TUNING.grabMaxFall) return;
+  const r = TUNING.playerRadius;
+  const hands = p.y + TUNING.hangReach;
+  let best: { b: Block; axis: "x" | "z"; side: 1 | -1; gap: number } | null = null;
+  for (const b of w.tower.blocks) {
+    if (!GRABBABLE.includes(b.kind) || !solidNow(w, b)) continue;
+    if (hands < b.maxY - 0.3 || hands > b.maxY + 0.15) continue;
+    // Colgado, los pies no pueden quedar en el agua.
+    if (b.maxY - TUNING.hangReach < TUNING.waterY + 0.3) continue;
+    const faces: { axis: "x" | "z"; side: 1 | -1; gap: number; along: number; lo: number; hi: number; away: number }[] = [
+      { axis: "x", side: -1, gap: b.minX - (p.x + r), along: p.z, lo: b.minZ, hi: b.maxZ, away: -p.vx },
+      { axis: "x", side: 1, gap: p.x - r - b.maxX, along: p.z, lo: b.minZ, hi: b.maxZ, away: p.vx },
+      { axis: "z", side: -1, gap: b.minZ - (p.z + r), along: p.x, lo: b.minX, hi: b.maxX, away: -p.vz },
+      { axis: "z", side: 1, gap: p.z - r - b.maxZ, along: p.x, lo: b.minX, hi: b.maxX, away: p.vz },
+    ];
+    for (const f of faces) {
+      if (f.gap < -0.08 || f.gap > TUNING.grabReach) continue;
+      if (f.along < f.lo + 0.15 || f.along > f.hi - 0.15) continue;
+      if (f.away > TUNING.grabMaxAway) continue;
+      if (!best || f.gap < best.gap) best = { b, axis: f.axis, side: f.side, gap: f.gap };
+    }
+  }
+  if (!best) return;
+  const { b, axis, side } = best;
+  const spot = hangSpot(b, axis, side, axis === "x" ? p.z : p.x);
+  // Lugar para colgarse y, arriba, para subirse.
+  if (!roomFor(w, spot.x, spot.y, spot.z, b.id)) return;
+  p.hang = { block: b.id, axis, side, time: 0 };
+  Object.assign(p, spot, { vx: 0, vy: 0, vz: 0, grounded: false, on: null, riding: null, gliding: false, safe: false });
+  p.facing = axis === "x" ? (side < 0 ? Math.PI / 2 : -Math.PI / 2) : side < 0 ? 0 : Math.PI;
+  events.push({ type: "grab" });
+}
+
+function letGo(w: World, events: SimEvent[], tired: boolean) {
+  const p = w.player;
+  if (!p.hang) return;
+  const { axis, side } = p.hang;
+  p.hang = null;
+  p.grabCooldown = TUNING.grabCooldown;
+  // Un empujoncito para afuera, así no se vuelve a enganchar.
+  if (axis === "x") p.vx = side * 1.2;
+  else p.vz = side * 1.2;
+  events.push({ type: "letGo", tired });
+}
+
+/** Colgado: de costado se avanza por el borde; hacia el bloque (o saltando) se sube; para atrás se suelta. */
+function hangStep(w: World, input: PlayerInput, dt: number, events: SimEvent[]) {
+  const p = w.player;
+  const hang = p.hang!;
+  const b = blockOf(w.tower, hang.block);
+  hang.time += dt;
+  p.grounded = false;
+  if (!b || !solidNow(w, b)) return letGo(w, events, false);
+  if (hang.time > TUNING.hangTime + TUNING.hangPerGrip * w.stats.grip || w.energy <= 0) return letGo(w, events, true);
+  // Componente hacia el bloque y a lo largo del borde.
+  const into = hang.axis === "x" ? -hang.side * input.moveX : -hang.side * input.moveZ;
+  const along = hang.axis === "x" ? input.moveZ : input.moveX;
+  p.jumpBuffer = input.jumpPressed ? TUNING.jumpBuffer : Math.max(0, p.jumpBuffer - dt);
+  // Un instante colgado antes de subir (se ve el agarre y se puede elegir).
+  if ((p.jumpBuffer > 0 && hang.time > 0.08) || (into > 0.5 && hang.time > TUNING.pullUpHold)) {
+    // Subirse: cuesta un poco más que un salto.
+    p.jumpBuffer = 0;
+    w.energy = Math.max(0, w.energy - TUNING.pullUpCost * w.stats.drainMult);
+    const inward = 0.45;
+    const to = hang.axis === "x"
+      ? { x: hang.side < 0 ? b.minX + inward : b.maxX - inward, y: b.maxY, z: p.z }
+      : { x: p.x, y: b.maxY, z: hang.side < 0 ? b.minZ + inward : b.maxZ - inward };
+    if (!roomFor(w, to.x, to.y + 0.02, to.z, b.id)) return letGo(w, events, false);
+    p.pullUp = { block: b.id, t: 0, from: { x: p.x, y: p.y, z: p.z }, to };
+    p.hang = null;
+    events.push({ type: "jump", double: false });
+    return;
+  }
+  if (into < -0.6) return letGo(w, events, false);
+  // Avanzar por el borde, sin pasarse de la punta.
+  if (Math.abs(along) > 0.2) {
+    const lo = (hang.axis === "x" ? b.minZ : b.minX) + 0.2;
+    const hi = (hang.axis === "x" ? b.maxZ : b.maxX) - 0.2;
+    const now = hang.axis === "x" ? p.z : p.x;
+    const next = Math.max(lo, Math.min(hi, now + along * TUNING.shimmySpeed * dt));
+    if (hang.axis === "x") p.z = next;
+    else p.x = next;
+    p.vx = hang.axis === "z" ? along * TUNING.shimmySpeed : 0;
+    p.vz = hang.axis === "x" ? along * TUNING.shimmySpeed : 0;
+  } else {
+    p.vx = 0;
+    p.vz = 0;
+  }
+  p.vy = 0;
+}
+
+/** Subiéndose: primero el cuerpo para arriba, después las piernas para adentro. */
+function pullUpStep(w: World, dt: number, events: SimEvent[]) {
+  const p = w.player;
+  const up = p.pullUp!;
+  const b = blockOf(w.tower, up.block);
+  if (!b || !solidNow(w, b)) {
+    p.pullUp = null;
+    return;
+  }
+  up.t = Math.min(1, up.t + dt / TUNING.pullUpTime);
+  const rise = Math.min(1, up.t / 0.6);
+  const slide = Math.max(0, (up.t - 0.6) / 0.4);
+  const ease = (k: number) => 1 - (1 - k) * (1 - k);
+  p.y = up.from.y + (up.to.y + 0.05 - up.from.y) * ease(rise) - (slide > 0 ? 0.05 * slide : 0);
+  p.x = up.from.x + (up.to.x - up.from.x) * ease(slide);
+  p.z = up.from.z + (up.to.z - up.from.z) * ease(slide);
+  p.vx = p.vy = p.vz = 0;
+  p.grounded = false;
+  if (up.t < 1) return;
+  p.pullUp = null;
+  p.y = b.maxY;
+  p.grounded = true;
+  p.on = b.id;
+  p.ground = b.kind;
+  p.safe = SAFE.includes(b.kind);
+  p.usedDouble = false;
+  if (!p.slipping) w.run.maxY = Math.max(w.run.maxY, p.y);
+  events.push({ type: "pullUp" }, { type: "land", impact: 0, kind: b.kind });
+}
+
 /** Las que se desinflan: aguantan un ratito desde que las pisás y después vuelven. */
 function crumble(w: World, events: SimEvent[]) {
   const p = w.player;
@@ -602,6 +780,8 @@ function hazards(w: World, events: SimEvent[]) {
     p.vy = TUNING.knockLift;
     p.grounded = false;
     p.climbing = false;
+    p.hang = null;
+    p.pullUp = null;
     p.on = null;
     p.riding = null;
     p.stun = TUNING.stunTime;

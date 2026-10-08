@@ -243,6 +243,136 @@ describe("La Torre: moverse", () => {
   });
 });
 
+describe("La Torre: agarrarse del borde", () => {
+  // Sin martillos ni cañones: acá se mide el agarre.
+  const calm = calmTower(tower);
+  const world = (stats: Stats = base) => createWorld(calm, stats, { record: 0, highestRest: -1 });
+  /** Un escalón del carril de adelante (con aire del lado de la pileta), bien arriba del agua. */
+  const ledge = calm.path
+    .map((s) => blockOf(calm, s.id))
+    .filter((b): b is Block => !!b && b.kind === "normal" && b.floor >= 1)
+    .sort((a, b) => b.maxZ - a.maxZ)[0];
+
+  /** Cayendo de espaldas a la pileta, con las manos justo por arriba del borde de adelante. */
+  function fallBeside(w: World, b: Block, { vy = -1, vz = 0, dx = 0 } = {}) {
+    const c = centerOf(b);
+    Object.assign(w.player, { x: c.x + dx, y: b.maxY - TUNING.hangReach + 0.08, z: b.maxZ + TUNING.playerRadius + 0.1, vx: 0, vy, vz, grounded: false, on: null, riding: null, safe: false });
+    w.energy = 999;
+  }
+  function hanging(w: World, b: Block) {
+    fallBeside(w, b);
+    const events = run(w, 0.2, undefined, (e) => e.some((x) => x.type === "grab"));
+    expect(events.some((e) => e.type === "grab")).toBe(true);
+  }
+
+  it("cayendo al lado de un bloque, te agarrás del borde y te quedás colgado", () => {
+    const w = world();
+    hanging(w, ledge);
+    expect(w.player.hang).toMatchObject({ block: ledge.id, axis: "z", side: 1 });
+    expect(w.player.y).toBeCloseTo(ledge.maxY - TUNING.hangReach, 5);
+    expect(w.player.facing).toBeCloseTo(Math.PI, 5); // mirando a la pared
+    run(w, 1);
+    expect(w.player.hang).not.toBeNull();
+    expect(w.player.y).toBeCloseTo(ledge.maxY - TUNING.hangReach, 5);
+  });
+
+  it("colgado, de costado avanzás por el borde sin pasarte de la punta", () => {
+    const w = world();
+    hanging(w, ledge);
+    const x0 = w.player.x;
+    run(w, 0.3, () => hold(1, 0));
+    expect(w.player.x).toBeCloseTo(x0 + TUNING.shimmySpeed * 0.3, 1);
+    run(w, 2, () => hold(1, 0));
+    expect(w.player.x).toBeCloseTo(ledge.maxX - 0.2, 5);
+    expect(w.player.hang).not.toBeNull();
+  });
+
+  it("saltando te subís arriba del bloque (gasta más energía que un salto)", () => {
+    const w = world();
+    hanging(w, ledge);
+    run(w, 0.1);
+    const before = w.energy;
+    const events = run(w, 1, (x) => press(x.player.hang !== null));
+    expect(events.some((e) => e.type === "pullUp")).toBe(true);
+    expect(w.player).toMatchObject({ grounded: true, on: ledge.id, hang: null, pullUp: null });
+    expect(w.player.y).toBe(ledge.maxY);
+    expect(w.player.z).toBeLessThan(ledge.maxZ);
+    expect(before - w.energy).toBeGreaterThanOrEqual(TUNING.pullUpCost);
+    expect(w.run.maxY).toBe(ledge.maxY);
+  });
+
+  it("empujando hacia el bloque también te subís (después de un instante colgado)", () => {
+    const w = world();
+    hanging(w, ledge);
+    run(w, TUNING.pullUpHold * 0.5, () => hold(0, -1));
+    expect(w.player.pullUp).toBeNull();
+    const events = run(w, 1, () => hold(0, -1), (e) => e.some((x) => x.type === "pullUp"));
+    expect(events.some((e) => e.type === "pullUp")).toBe(true);
+    expect(w.player).toMatchObject({ grounded: true, on: ledge.id });
+  });
+
+  it("para atrás te soltás, y no te volvés a enganchar enseguida", () => {
+    const w = world();
+    hanging(w, ledge);
+    const events = run(w, 0.3, () => hold(0, 1));
+    expect(events).toContainEqual({ type: "letGo", tired: false });
+    expect(events.filter((e) => e.type === "grab")).toEqual([]);
+    expect(w.player.hang).toBeNull();
+    expect(w.player.y).toBeLessThan(ledge.maxY - TUNING.hangReach);
+  });
+
+  it("colgado no se aguanta para siempre (con Agarre, más)", () => {
+    const tired = (stats: Stats) => {
+      const w = world(stats);
+      hanging(w, ledge);
+      let held = 0;
+      run(w, 10, undefined, (e) => {
+        held += DT;
+        return e.some((x) => x.type === "letGo");
+      });
+      return held;
+    };
+    expect(tired(base)).toBeCloseTo(TUNING.hangTime, 1);
+    expect(tired(statsFor({ ...NO_UPGRADES, grip: 3 }))).toBeCloseTo(TUNING.hangTime + 3 * TUNING.hangPerGrip, 1);
+  });
+
+  it("no te agarrás si te tirás para afuera, si caés de muy alto o si no te queda energía", () => {
+    const tries: [string, (w: World) => void][] = [
+      ["tirándose", (w) => fallBeside(w, ledge, { vz: TUNING.grabMaxAway + 1 })],
+      ["de muy alto", (w) => fallBeside(w, ledge, { vy: -TUNING.grabMaxFall - 2 })],
+      ["sin energía", (w) => {
+        fallBeside(w, ledge);
+        w.energy = 0;
+      }],
+    ];
+    for (const [why, setup] of tries) {
+      const w = world();
+      setup(w);
+      const events = run(w, 0.3);
+      expect(events.filter((e) => e.type === "grab"), why).toEqual([]);
+    }
+  });
+
+  it("de lo redondo no hay de dónde agarrarse", () => {
+    const ball = firstOf("ball");
+    const w = world();
+    fallBeside(w, ball);
+    expect(run(w, 0.3).filter((e) => e.type === "grab")).toEqual([]);
+  });
+
+  it("la parpadeante, cuando se apaga, te suelta", () => {
+    const blink = firstOf("blink");
+    const w = world();
+    let t = 0;
+    while (!blinkOn(blink, t) || blinkOn(blink, t + 0.5)) t += 0.01;
+    w.time = t;
+    hanging(w, blink);
+    const events = run(w, 1);
+    expect(events).toContainEqual({ type: "letGo", tired: false });
+    expect(w.player.hang).toBeNull();
+  });
+});
+
 describe("La Torre: estrellas doradas", () => {
   // Sin martillos ni cañones: acá se mide si se llega, no si te tiran.
   const calm = calmTower(tower);

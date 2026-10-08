@@ -111,6 +111,16 @@ export function Effects({ frame }: { frame: React.RefObject<Frame | null> }) {
           case "mantle":
             pop("¡ARRIBA!", PALETTE.white, p.x, p.y + 2, p.z, 0.4);
             break;
+          case "grab":
+            // Polvito en las manos.
+            burst(p.x, p.y + TUNING.hangReach, p.z, 8, ["#ffffff", "#e2e8f0"], 1.5, 1, 4, 0.08, 0.35);
+            break;
+          case "pullUp":
+            pop("¡ARRIBA!", PALETTE.white, p.x, p.y + 2, p.z, 0.4);
+            break;
+          case "letGo":
+            if (e.tired) pop("¡NO AGUANTO MÁS!", PALETTE.red, p.x, p.y + 2.2, p.z, 0.4);
+            break;
           case "land":
             if (e.impact > 9) burst(p.x, p.y + 0.05, p.z, 10, ["#ffffff", "#e2e8f0"], 2.5, 1.5, 6, 0.1, 0.4);
             break;
@@ -139,6 +149,8 @@ export function Effects({ frame }: { frame: React.RefObject<Frame | null> }) {
   // Estela (cosmético): va soltando partículas mientras te movés.
   const trail = useTower((s) => s.trail);
   const trailClock = useRef(0);
+  const dustClock = useRef(0);
+  const dustSpeed = useRef(0);
 
   useFrame((_, delta) => {
     const m = mesh.current;
@@ -166,6 +178,31 @@ export function Effects({ frame }: { frame: React.RefObject<Frame | null> }) {
           color,
           gravity: style.gravity,
         });
+      }
+    }
+    // Polvito en los pies al correr fuerte (y al frenar de golpe).
+    if (f && p && f.world.phase === "playing" && p.grounded && list.length < MAX_PARTICLES - 4) {
+      const speed = Math.hypot(p.vx, p.vz);
+      const braking = speed > 2 && speed < dustSpeed.current - 0.15;
+      dustSpeed.current = speed;
+      if (speed > 4 || braking) {
+        dustClock.current += dt * (braking ? 3 : 1);
+        while (dustClock.current > 0.12 && list.length < MAX_PARTICLES) {
+          dustClock.current -= 0.12;
+          list.push({
+            x: p.x - p.vx * 0.03 + (Math.random() - 0.5) * 0.25,
+            y: p.y + 0.05,
+            z: p.z - p.vz * 0.03 + (Math.random() - 0.5) * 0.25,
+            vx: -p.vx * 0.08 + (Math.random() - 0.5) * 0.4,
+            vy: 0.6 + Math.random() * 0.5,
+            vz: -p.vz * 0.08 + (Math.random() - 0.5) * 0.4,
+            life: 0.35,
+            max: 0.35,
+            size: 0.06 + Math.random() * 0.05,
+            color: new THREE.Color(Math.random() < 0.5 ? "#ffffff" : "#e2e8f0"),
+            gravity: 1,
+          });
+        }
       }
     }
     const mat = new THREE.Matrix4();

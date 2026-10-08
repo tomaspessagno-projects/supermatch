@@ -75,7 +75,10 @@ src/
     ├── team.ts               Manda los metros de cada intento al equipo (RPC tower_cash)
     ├── view/                 three.js (solo dibuja y suena)
     │   ├── TowerCanvas.tsx   <Canvas>, bucle, cámara, evento en vivo, eventos → sonido/store
-    │   ├── Player.tsx        Concursante procedural (grupos articulados)
+    │   ├── Player.tsx        El concursante: muñeco por código o modelo GLB, y su sombra
+    │   ├── character/        Animación: state.ts (qué hace, mezcla, resortes), poses.ts,
+    │   │                     rig.ts, Procedural.tsx (el muñeco), Model.tsx (GLB),
+    │   │                     clips.ts (nombres de animaciones del GLB), Hat.tsx
     │   ├── Pet.tsx           La mascota que te sigue
     │   ├── Tower.tsx         Junta todo + fichas, regalos y el muelle
     │   ├── tower/            Facade (fachada, corona, carteles), Blocks (estáticos),
@@ -116,6 +119,12 @@ src/
 - **Redes:** dentro de la zona de la red y apretando hacia la pared, se trepa (sin
   gravedad, gasta más energía); cerca de arriba, un saltito para adentro te deja sobre
   la columna. Saltando te soltás para atrás (y por 0,35 s no te agarrás).
+- **Bordes:** cayendo (o en lo más alto) con las manos (`p.y + hangReach`) cerca del
+  borde de un bloque que tenés al lado, te colgás (`player.hang`: bloque, cara, tiempo).
+  Colgado no hay gravedad; de costado avanzás por la cara, empujando hacia el bloque (o
+  saltando) empieza `player.pullUp` (0,55 s: primero sube, después entra) y para atrás
+  te soltás (`grabCooldown` evita reengancharse). Antes de colgarse y de subirse se
+  verifica que haya lugar para el cuerpo (`roomFor`). Eventos: `grab`, `pullUp`, `letGo`.
 - **Géiseres y ventiladores:** zonas que, mientras están activas, te suben (velocidad
   mínima hacia arriba) o te arrastran (deriva de velocidad, menor si estás parado).
 - **Eventos en vivo:** `world.modifier` (lo pone la vista según el reloj) cambia la
@@ -130,7 +139,9 @@ src/
 - **Determinismo:** misma semilla, mismos inputs y mismo evento = mismo resultado.
 - **Tests de alcance:** `level.test.ts` sube cada paso del camino con el piloto
   automático sobre la simulación real (sin lo que empuja) y verifica qué nivel de Salto
-  pide cada piso, que no haya techos sobre el camino ni bloques encimados.
+  pide cada piso con saltos limpios (agarrarse cuenta como no llegar), que colgándose se
+  sube sin mejoras salvo en el piso 8, que no haya techos sobre el camino ni bloques
+  encimados.
 
 ### Objetivos
 
@@ -170,7 +181,34 @@ poder subirse o pasó a ser trivial.
   de costado (`input.yaw/pitch`). El fondo del estudio sube con la cámara.
 - La luz principal viene de adelante y arriba: la sombra de cada plataforma cae sobre la
   fachada, y eso ayuda mucho a leer la profundidad.
-- Con `?debug` en la URL queda `window.__torre` (el `Frame`) para las pruebas e2e.
+- Con `?debug` en la URL queda `window.__torre` (el `Frame`) para las pruebas e2e;
+  `?zoom=0.4` acerca la cámara (para mirar animaciones o grabar).
+
+### El concursante y sus animaciones
+
+- `character/state.ts` (puro, con tests): `pickClip` elige una de 17 animaciones según la
+  simulación (idle, run, skate, jump, fall, flip, glide, hang, shimmy, pullUp, climb,
+  lifted, slip, hit, swim, cheer, teeter). `CharacterDriver` las **mezcla con pesos**
+  (la nueva sube a 1 y las otras bajan, con un tiempo por animación: así nunca salta de
+  una pose a otra, y los ciclos no pierden amplitud como pasaría suavizando la pose),
+  lleva los resortes (aplastarse al caer según el impacto, estirarse al saltar, el
+  péndulo al colgarse, las cintas de la vincha), el parpadeo, el mortal del doble salto
+  y las vueltas del golpe (se suman aparte para no mezclar ángulos de 2π).
+- `poses.ts`: una función por animación que da el ángulo de cada articulación
+  (`rig.ts`: cadera, columna, cabeza, hombros, codos, muslos, rodillas, tobillos y la
+  cara). Correr tiene cadencia según la velocidad, rodilla que se dobla al pasar,
+  contra-giro de torso y cadera, rebote y se inclina al acelerar y en las curvas.
+  Encima va el agachado con las piernas que se doblan de verdad (los pies quedan en el
+  piso). Un test verifica que colgado las manos caen sobre el borde que usa la
+  simulación.
+- `Procedural.tsx` dibuja el muñeco con esas poses; `Model.tsx` carga un GLB con
+  esqueleto (`useGLTF`, `SkeletonUtils.clone`), lo escala a la altura del jugador, pasa
+  los materiales a toon, pinta el material `shirt` del color del equipo, saca el avance
+  del hueso raíz (animaciones en el lugar), mide a qué altura quedan las manos en `hang`
+  para colgarlo justo, pone el sombrero en el hueso de la cabeza y hace crossfade entre
+  clips (correr se acelera con la velocidad; `pullup` lo maneja la simulación).
+  `clips.ts` reconoce nuestros nombres y los de Mixamo, y si falta uno usa el más
+  parecido. Si el GLB falla, un error boundary vuelve al muñeco.
 
 ## Infraestructura
 

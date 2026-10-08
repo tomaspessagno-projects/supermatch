@@ -35,7 +35,7 @@ const FLOOR_LINES: Record<number, string> = {
 
 const angleDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
-type LoopState = { acc: number; hudAt: number; yaw: number; lead: number; ready: boolean; look: THREE.Vector3; fwd: THREE.Vector3 };
+type LoopState = { acc: number; hudAt: number; yaw: number; lead: number; ready: boolean; look: THREE.Vector3; fwd: THREE.Vector3; zoom: number };
 
 /** Un cuadro: teclas → simulación en pasos fijos → cámara → HUD. */
 function advance(f: Frame, c: LoopState, camera: THREE.Camera, delta: number, onEvents: (e: readonly SimEvent[]) => void) {
@@ -81,8 +81,8 @@ function advance(f: Frame, c: LoopState, camera: THREE.Camera, delta: number, on
     lens.fov = fov;
     lens.updateProjectionMatrix();
   }
-  const distance = CAMERA_DISTANCE * (1 + narrow * 0.5);
-  const height = (CAMERA_HEIGHT + input.pitch * 4) * (1 + narrow * 0.3);
+  const distance = CAMERA_DISTANCE * (1 + narrow * 0.5) * c.zoom;
+  const height = (CAMERA_HEIGHT + input.pitch * 4) * (1 + narrow * 0.3) * c.zoom;
   const lookX = pos.x + c.lead;
   const desired = new THREE.Vector3(lookX + Math.sin(c.yaw) * distance, pos.y + height, pos.z + Math.cos(c.yaw) * distance);
   const look = new THREE.Vector3(lookX, pos.y + 1.3, pos.z - 0.4);
@@ -123,7 +123,12 @@ function advance(f: Frame, c: LoopState, camera: THREE.Camera, delta: number, on
 /** El bucle: corre antes que todo lo demás en cada cuadro. */
 function Loop({ frame, onEvents }: { frame: React.RefObject<Frame | null>; onEvents: (e: readonly SimEvent[]) => void }) {
   // Estado del bucle (mutable, fuera de React).
-  const loop = useRef<LoopState>({ acc: 0, hudAt: 0, yaw: 0, lead: 0, ready: false, look: new THREE.Vector3(), fwd: new THREE.Vector3() });
+  const loop = useRef<LoopState>({ acc: 0, hudAt: 0, yaw: 0, lead: 0, ready: false, look: new THREE.Vector3(), fwd: new THREE.Vector3(), zoom: 1 });
+  // ?zoom=0.4: cámara más cerca (para mirar las animaciones o grabar).
+  useEffect(() => {
+    const zoom = Number(new URLSearchParams(window.location.search).get("zoom"));
+    if (zoom >= 0.2 && zoom <= 3) loop.current.zoom = zoom;
+  }, []);
   useFrame((state, delta) => {
     if (frame.current) advance(frame.current, loop.current, state.camera, delta, onEvents);
   }, -1);
@@ -134,6 +139,7 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
   const frame = useRef<Frame | null>(null);
   const tower = useMemo(() => buildTower(), []);
   const bagWarned = useRef(false);
+  const grabTipped = useRef(false);
 
   // El mundo se arma al montar (el bucle espera hasta que exista).
   useEffect(() => {
@@ -199,6 +205,19 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
           break;
         case "mantle":
           play("land", { volume: 0.4, vary: 2 });
+          break;
+        case "grab":
+          play("land", { volume: 0.3, vary: 4 });
+          if (!grabTipped.current && store.counters.pullUps === 0) {
+            grabTipped.current = true;
+            store.announce("¡Colgado del borde! Saltá (o apretá hacia el bloque) para subirte. Para atrás te soltás.");
+          }
+          break;
+        case "pullUp":
+          play("land", { volume: 0.45, vary: 2 });
+          break;
+        case "letGo":
+          if (e.tired) play("fail", { volume: 0.4, vary: 2 });
           break;
         case "chip":
           play("pop", { vary: 3, volume: 0.6 });

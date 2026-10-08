@@ -132,7 +132,7 @@ const EMPTY: Save = {
 };
 
 /** Las cosas de hoy que cuentan para las misiones del día. */
-const DAILY_COUNTERS: readonly Counter[] = ["runs", "chips", "fame", "items", "height", "superBounces", "nets", "geysers", "knocks", "stars"];
+const DAILY_COUNTERS: readonly Counter[] = ["runs", "chips", "fame", "items", "height", "superBounces", "nets", "geysers", "knocks", "pullUps", "stars"];
 
 /**
  * Aplica `updates` a los contadores y cobra todo lo que se cumpla: la misión
@@ -254,6 +254,8 @@ export const useTower = create<TowerState>()(
               return e.big ? track({ superBounces: 1 }) : undefined;
             case "mantle":
               return track({ nets: 1 });
+            case "pullUp":
+              return track({ pullUps: 1 });
             case "lift":
               return track({ geysers: 1 });
             case "knock":

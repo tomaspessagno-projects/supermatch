@@ -57,6 +57,24 @@ export const TUNING = {
   mantlePush: 2.5,
   netJumpOut: 4.5,
   netCooldown: 0.35,
+  /** Agarrarse del borde: desde los pies hasta las manos estiradas (m). */
+  hangReach: 1.45,
+  /** Qué tan lejos de la cara del bloque todavía te agarrás (m). */
+  grabReach: 0.35,
+  /** Si venías más rápido que esto para afuera, no te agarrás (te tiraste a propósito). */
+  grabMaxAway: 3,
+  /** Cayendo más rápido que esto (de muy alto), tampoco: te vas de largo a la pileta. */
+  grabMaxFall: 13,
+  /** Cuánto aguantás colgado, y cuánto más por cada nivel de Agarre (s). */
+  hangTime: 2.5,
+  hangPerGrip: 1.2,
+  shimmySpeed: 1.6,
+  /** Subirse al borde: lo que tarda y la energía que gasta (más que un salto: saltar más alto ahorra). */
+  pullUpTime: 0.55,
+  pullUpCost: 3,
+  /** Colgado, empujar hacia el bloque te sube recién después de esto (saltando, enseguida). */
+  pullUpHold: 0.25,
+  grabCooldown: 0.4,
   /** Géiser: mientras sale y estás adentro, te sube a esta velocidad. */
   geyserSpeed: 9.5,
   /** Ventilador: cuando sopla, te arrastra a esta velocidad. */

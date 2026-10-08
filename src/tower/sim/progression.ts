@@ -19,9 +19,9 @@ export type UpgradeDef = {
 
 export const UPGRADES: readonly UpgradeDef[] = [
   { id: "energy", name: "Energía", detail: "Más saltos antes de quedarte sin nafta", emoji: "⚡", base: 15, growth: 1.55, max: 15 },
-  { id: "jump", name: "Salto", detail: "Saltás más alto (los pisos de arriba lo piden)", emoji: "🦘", base: 25, growth: 1.7, max: 8 },
+  { id: "jump", name: "Salto", detail: "Saltás más alto: los escalones altos sin colgarte", emoji: "🦘", base: 25, growth: 1.7, max: 8 },
   { id: "bag", name: "Mochila", detail: "Llevás más objetos por intento", emoji: "🎒", base: 20, growth: 1.6, max: 8 },
-  { id: "grip", name: "Agarre", detail: "Menos resbalón en el jabón y en el viento", emoji: "🧤", base: 40, growth: 1.9, max: 3 },
+  { id: "grip", name: "Agarre", detail: "Menos resbalón en el jabón y el viento, y aguantás más colgado", emoji: "🧤", base: 40, growth: 1.9, max: 3 },
   { id: "magnet", name: "Imán", detail: "Agarrás fichas y objetos desde más lejos", emoji: "🧲", base: 60, growth: 2, max: 4 },
   { id: "elevator", name: "Ascensor", detail: "Arrancás desde el último descanso al que llegaste", emoji: "🛗", base: 250, growth: 1, max: 1 },
   { id: "double", name: "Doble salto", detail: "Un segundo salto en el aire", emoji: "💨", base: 400, growth: 1, max: 1 },
