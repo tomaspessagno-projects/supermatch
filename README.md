@@ -1,10 +1,12 @@
 # Supermatch: La Torre
 
 Juego web 3D progresivo, inspirado en el programa de TV. Una torre inflable gigante y
-enjabonada en medio de una pileta: subís todo lo que podés, te caés al agua, cobrás la
-fama de lo que subiste y juntaste, mejorás al concursante en el kiosco y volvés a subir
-más alto. Seis pisos con temas (jabón, viento, barredoras, burbujas, nubes), objetos con
-rarezas y mutaciones, y La Copa arriba de todo. Elegís facción (Rojo, Azul, Amarillo o
+enjabonada en medio de una pileta, vista de frente: subís su fachada en zigzag todo lo
+que podés, te caés al agua, cobrás la fama de lo que subiste y juntaste, mejorás al
+concursante en el kiosco y volvés a subir más alto. Ocho pisos con sus cosas (jabón y
+cintas, camas elásticas, bolas rojas, martillos y guantes, redes y cañones, géiseres,
+nubes y calesitas), objetos con rarezas y mutaciones, mascotas, temporadas, eventos en
+vivo cada 5 minutos y La Copa arriba de todo. Elegís facción (Rojo, Azul, Amarillo o
 Verde) para siempre.
 
 Los minijuegos 2D anteriores (El Puente Resbaladizo, El Tronco Loco, El Colchón y las

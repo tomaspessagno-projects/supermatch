@@ -1,9 +1,12 @@
 import { mulberry32 } from "./random";
 
 /**
- * La torre inflable: un caracol de bloques alrededor de una columna, por
- * pisos de 12 m, cada uno con su obstáculo. Arriba de cada piso hay un anillo
- * de descanso (salvavidas). Abajo, la pileta y la orilla con el kiosco.
+ * La torre inflable, vista de frente: una fachada enorme en medio de la pileta
+ * y un camino de plataformas que la sube en zigzag, de un costado al otro.
+ * En cada vuelta cambia de carril (pegado a la pared o más afuera), así una
+ * fila nunca queda justo arriba de la anterior. Ocho pisos (de 10 a 15 m),
+ * cada uno con sus cosas, y un descanso ancho al final de cada piso.
+ *
  * La torre es igual para todos (semilla fija); lo que cambia en cada intento
  * es qué hay en las cornisas.
  */
@@ -11,29 +14,88 @@ import { mulberry32 } from "./random";
 export type Box = { minX: number; minY: number; minZ: number; maxX: number; maxY: number; maxZ: number };
 export type Vec3 = { x: number; y: number; z: number };
 
-export type BlockKind = "deck" | "normal" | "soap" | "bubble" | "rest" | "ledge" | "goal" | "elevator";
-export type Block = Box & { id: number; kind: BlockKind; floor: number };
+export type BlockKind =
+  | "deck"
+  | "elevator"
+  | "wall"
+  | "normal"
+  | "soap"
+  | "conveyor"
+  | "trampoline"
+  | "crumble"
+  | "ball"
+  | "bubble"
+  | "blink"
+  | "spinner"
+  | "pillar"
+  | "rail"
+  | "rest"
+  | "ledge"
+  | "goal";
 
-/** Lo que se mueve: barredoras (te tiran) y nubes (te llevan). */
+export type Block = Box & {
+  id: number;
+  kind: BlockKind;
+  floor: number;
+  /** Cinta: velocidad en x (m/s). */
+  belt?: number;
+  /** Calesita: velocidad de giro (rad/s, el signo es el sentido). */
+  spin?: number;
+  /** Parpadeo: período (s) y fase (0 a 1). */
+  period?: number;
+  phase?: number;
+};
+
+/**
+ * Lo que se mueve: barredoras (te tiran), nubes (te llevan), martillos
+ * (péndulos que te tiran) y guantes de box (salen de la pared y te empujan a
+ * la pileta).
+ */
+export type MoverKind = "sweeper" | "cloud" | "hammer" | "piston";
 export type Mover = {
   id: number;
-  kind: "sweeper" | "cloud";
-  /** Caja en el centro del recorrido. */
+  kind: MoverKind;
+  /** Caja en el centro del recorrido (el guante: guardado en la pared). */
   box: Box;
   axis: "x" | "z";
   amplitude: number;
   period: number;
   phase: number;
   floor: number;
+  /** Martillo: largo de la soga (m). */
+  length?: number;
 };
 
-/** Zona de viento: cuando sopla, empuja para afuera de la torre. */
-export type Wind = Box & { dirX: number; dirZ: number; period: number; phase: number; floor: number };
+/** Ventilador: cuando sopla, empuja hacia `dir`. */
+export type Wind = Box & { id: number; dirX: number; dirZ: number; period: number; phase: number; floor: number };
+
+/** Cañón de espuma: dispara pelotas en línea recta cada `period` segundos. */
+export type Cannon = {
+  id: number;
+  x: number;
+  y: number;
+  z: number;
+  /** Dirección del tiro (unitaria). */
+  dx: number;
+  dy: number;
+  dz: number;
+  range: number;
+  speed: number;
+  period: number;
+  phase: number;
+  floor: number;
+};
+
+/** Géiser: un chorro que sale de una plataforma y te sube. */
+export type Geyser = Box & { id: number; period: number; phase: number; floor: number };
+
+/** Red para trepar: la zona delante de la cara de una columna. */
+export type Net = Box & { id: number; floor: number; pillar: number };
 
 /** Lugar donde puede aparecer una ficha (camino) o un objeto (cornisa). */
 export type Spot = Vec3 & { id: number; floor: number; ledge: boolean };
 
-export type Theme = "warmup" | "soap" | "wind" | "sweeper" | "bubble" | "cloud";
+export type Theme = "warmup" | "soap" | "bounce" | "balls" | "hammers" | "nets" | "geysers" | "sky";
 
 export type Floor = {
   index: number;
@@ -45,7 +107,7 @@ export type Floor = {
   needJump: number;
 };
 
-/** Un escalón del camino, en orden de abajo para arriba (bloque fijo o nube). */
+/** Un paso del camino, en orden de abajo para arriba (bloque fijo o nube). */
 export type PathStep = { kind: "block" | "mover"; id: number; floor: number };
 
 export type Tower = {
@@ -53,50 +115,104 @@ export type Tower = {
   path: PathStep[];
   movers: Mover[];
   winds: Wind[];
+  cannons: Cannon[];
+  geysers: Geyser[];
+  nets: Net[];
   spots: Spot[];
   floors: Floor[];
-  columnRadius: number;
   /** Altura de la cima (la Copa). */
   top: number;
-  /** Alturas de los anillos de descanso, de abajo para arriba. */
+  /** Alturas de los descansos, de abajo para arriba. */
   rests: number[];
+  /** Centro de cada descanso (donde te deja el ascensor). */
+  restSpots: Vec3[];
   start: Vec3;
   kiosk: Vec3;
   elevator: Box;
+  /** La fachada de la torre (no se atraviesa). */
+  wall: Box;
 };
 
-/** El caracol va por afuera de los anillos de descanso (que abrazan la columna). */
-const SPIRAL_RADIUS = 7;
-const RING_RADIUS = 3.6;
-const RING_BLOCK = 1.9;
-const COLUMN_RADIUS = 2.6;
-const FLOOR_HEIGHT = 12;
-const BLOCK_THICKNESS = 0.5;
+/** Media fachada (m). */
+export const WALL_HALF = 12.5;
+/** Las plataformas comunes van de -EDGE a EDGE en x. */
+const EDGE = 11.5;
+/** Centro de cada carril en z: pegado a la pared, o más afuera. */
+const LANE_Z: readonly (readonly [number, number])[] = [
+  [1.35, 1.75],
+  [4.5, 4.9],
+];
+const THICK = 0.5;
+const REST_WIDTH = 4.4;
+/** Los descansos ocupan todo su carril (en z). */
+const REST_Z: readonly (readonly [number, number])[] = [
+  [0.3, 3.0],
+  [3.4, 6.1],
+];
+
+/** Lo que te lanza para arriba: el paso siguiente puede estar mucho más alto. */
+const BUBBLE_RISE: readonly [number, number] = [2.6, 2.9];
+const TRAMPOLINE_RISE: readonly [number, number] = [3.0, 3.5];
+const GEYSER_RISE: readonly [number, number] = [3.0, 3.6];
+/** Alto de las columnas con red. */
+const NET_RISE: readonly [number, number] = [3.4, 4.4];
+
+type Beat =
+  | "step"
+  | "soap"
+  | "conveyor"
+  | "trampoline"
+  | "crumble"
+  | "ball"
+  | "fan"
+  | "hammer"
+  | "piston"
+  | "sweeper"
+  | "net"
+  | "geyser"
+  | "bubble"
+  | "cloud"
+  | "spinner"
+  | "blink";
 
 type FloorDef = {
   name: string;
   theme: Theme;
-  /** Subida entre escalones (m). */
+  /** Subida común entre plataformas (m). */
   rise: readonly [number, number];
-  /** Giro entre escalones (radianes). */
-  step: readonly [number, number];
+  /** Cada tres subidas comunes, una más alta: es la que pide mejoras de salto. */
+  tall?: readonly [number, number];
+  /** Hueco entre plataformas (m). */
+  gap: readonly [number, number];
   size: readonly [number, number];
+  /** Lo especial del piso, en ronda. Si uno no entra donde toca, pasa al paso siguiente. */
+  specials: readonly Beat[];
+  /** Alto del piso (m): los que tienen lanzamientos y redes son más altos. */
+  height: number;
 };
 
 const FLOOR_DEFS: readonly FloorDef[] = [
-  { name: "Calentamiento", theme: "warmup", rise: [0.8, 1.1], step: [0.37, 0.44], size: [2.4, 2.6] },
-  { name: "Jabón", theme: "soap", rise: [0.95, 1.25], step: [0.39, 0.46], size: [2.0, 2.4] },
-  // Desde acá los escalones más altos piden mejoras de salto (nivel 1, 2, 3).
-  { name: "Viento", theme: "wind", rise: [1.3, 1.7], step: [0.39, 0.46], size: [2.0, 2.3] },
-  { name: "Barredoras", theme: "sweeper", rise: [1.5, 1.86], step: [0.41, 0.48], size: [2.3, 2.6] },
-  { name: "Burbujas", theme: "bubble", rise: [1.6, 2.04], step: [0.41, 0.48], size: [2.0, 2.4] },
-  { name: "Nubes", theme: "cloud", rise: [1.4, 1.86], step: [0.44, 0.51], size: [2.0, 2.3] },
+  { name: "Calentamiento", theme: "warmup", rise: [0.5, 0.9], gap: [0.7, 1.3], size: [2.2, 2.6], specials: ["step"], height: 10 },
+  { name: "Jabón y cintas", theme: "soap", rise: [0.6, 1.0], gap: [0.8, 1.3], size: [2.0, 2.5], specials: ["soap", "conveyor", "soap", "step"], height: 10 },
+  { name: "Camas elásticas", theme: "bounce", rise: [0.6, 1.0], tall: [1.1, 1.25], gap: [0.8, 1.3], size: [2.0, 2.4], specials: ["trampoline", "crumble", "crumble", "trampoline", "crumble", "step"], height: 14 },
+  { name: "Bolas rojas", theme: "balls", rise: [0.6, 1.0], tall: [1.1, 1.3], gap: [0.9, 1.3], size: [2.0, 2.3], specials: ["ball", "ball", "ball", "fan", "step", "fan"], height: 10 },
+  // Desde acá las subidas altas piden mejoras de salto.
+  { name: "Martillos y guantes", theme: "hammers", rise: [0.7, 1.1], tall: [1.62, 1.7], gap: [0.9, 1.3], size: [2.2, 2.6], specials: ["hammer", "piston", "step", "sweeper", "piston"], height: 12 },
+  { name: "Redes y cañones", theme: "nets", rise: [0.7, 1.1], tall: [1.8, 1.88], gap: [0.9, 1.3], size: [2.1, 2.5], specials: ["net", "step", "net", "step"], height: 15 },
+  { name: "Géiseres y burbujas", theme: "geysers", rise: [0.8, 1.2], tall: [1.8, 1.88], gap: [0.9, 1.3], size: [2.0, 2.4], specials: ["geyser", "bubble", "step", "geyser", "step"], height: 15 },
+  { name: "Nubes y calesitas", theme: "sky", rise: [0.8, 1.2], tall: [1.8, 1.88], gap: [1.0, 1.4], size: [2.0, 2.3], specials: ["cloud", "spinner", "blink", "step"], height: 12 },
 ];
 
-/** Las burbujas tiran para arriba: el escalón después de una puede estar mucho más alto. */
-const BUBBLE_RISE = 2.9;
+/** Altura de la cima (la suma de los pisos). */
+export const TOWER_TOP = FLOOR_DEFS.reduce((sum, f) => sum + f.height, 0);
 
-const box = (cx: number, top: number, cz: number, sx: number, sz: number, thick = BLOCK_THICKNESS): Box => ({
+const LAUNCH_RISE: Partial<Record<Beat, readonly [number, number]>> = {
+  trampoline: TRAMPOLINE_RISE,
+  geyser: GEYSER_RISE,
+  bubble: BUBBLE_RISE,
+};
+
+const box = (cx: number, top: number, cz: number, sx: number, sz: number, thick = THICK): Box => ({
   minX: cx - sx / 2,
   maxX: cx + sx / 2,
   minY: top - thick,
@@ -105,122 +221,214 @@ const box = (cx: number, top: number, cz: number, sx: number, sz: number, thick 
   maxZ: cz + sz / 2,
 });
 
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+export const centerOf = (b: Box): Vec3 => ({ x: (b.minX + b.maxX) / 2, y: b.maxY, z: (b.minZ + b.maxZ) / 2 });
+
 export function buildTower(seed = 7): Tower {
   const random = mulberry32(seed);
   const between = ([a, b]: readonly [number, number]) => a + (b - a) * random();
   const blocks: Block[] = [];
   const movers: Mover[] = [];
   const winds: Wind[] = [];
+  const cannons: Cannon[] = [];
+  const geysers: Geyser[] = [];
+  const nets: Net[] = [];
   const spots: Spot[] = [];
   const floors: Floor[] = [];
   const rests: number[] = [];
+  const restSpots: Vec3[] = [];
   const path: PathStep[] = [];
   let id = 1;
-  const add = (b: Box, kind: BlockKind, floor: number) => {
-    const block = { ...b, id: id++, kind, floor };
+  const add = (b: Box, kind: BlockKind, floor: number, extra: Partial<Block> = {}) => {
+    const block: Block = { ...b, ...extra, id: id++, kind, floor };
     blocks.push(block);
     return block;
   };
 
-  // La orilla: un muelle grande con el kiosco y el ascensor.
-  add({ minX: -17, maxX: -8.7, minY: -1, maxY: 0, minZ: -4.5, maxZ: 4.5 }, "deck", -1);
-  const elevator = { minX: -16.5, maxX: -14.7, minY: -0.02, maxY: 0.04, minZ: 2.4, maxZ: 4.2 };
+  const top = TOWER_TOP;
+  // La orilla, a la izquierda de la torre: kiosco y ascensor.
+  const deck = add({ minX: -25, maxX: -13.5, minY: -1, maxY: 0, minZ: 0.3, maxZ: 7 }, "deck", -1);
+  const elevator = { minX: -16.4, maxX: -14.6, minY: -0.02, maxY: 0.04, minZ: 5.0, maxZ: 6.6 };
   add(elevator, "elevator", -1);
+  const wall: Box = { minX: -WALL_HALF, maxX: WALL_HALF, minY: -1, maxY: top + 6, minZ: -7, maxZ: 0 };
+  add(wall, "wall", -1);
 
-  // El caracol arranca justo enfrente de la orilla: caminar derecho lleva al primer escalón.
-  let angle = Math.PI - 0.4;
-  let prev: Box | null = null; // escalón anterior del caracol
+  let dir: 1 | -1 = 1;
+  let lane = 1;
   let y = 0;
+  let prev: Box = deck;
+  /** La próxima plataforma sigue de largo sí o sí (la primera, y la que sale de un descanso). */
+  let straight = true;
+
+  const laneZ = (depth: number) => Math.max(depth / 2 + 0.2, between(LANE_Z[lane]));
+  const nextX = (size: number, gap: number) => (dir > 0 ? prev.maxX : prev.minX) + dir * (gap + size / 2);
+  const fits = (size: number, gap: number) => straight || Math.abs(nextX(size, gap)) + size / 2 <= EDGE;
+  /** Dónde va la próxima plataforma: sigue de largo si entra; si no, da la vuelta (otro carril, mismo lugar). */
+  const place = (size: number, gap: number, depth: number, zGap: readonly [number, number]) => {
+    if (fits(size, gap)) {
+      straight = false;
+      return { cx: nextX(size, gap), cz: laneZ(depth) };
+    }
+    dir = dir > 0 ? -1 : 1;
+    lane = 1 - lane;
+    const dz = between(zGap);
+    const cz = lane === 1 ? prev.maxZ + dz + depth / 2 : prev.minZ - dz - depth / 2;
+    const px = (prev.minX + prev.maxX) / 2;
+    return { cx: clamp(px, -EDGE + size / 2, EDGE - size / 2), cz: Math.max(depth / 2 + 0.2, cz) };
+  };
+
+  let bottom = 0;
   FLOOR_DEFS.forEach((def, index) => {
-    const bottom = index * FLOOR_HEIGHT;
-    const top = bottom + FLOOR_HEIGHT;
+    const floorTop = bottom + def.height;
     let maxRise = 0;
     let n = 0;
-    let bubbleNext = false;
-    // Escalones hasta que el anillo de descanso quede a un salto normal.
-    while (top - y > def.rise[1]) {
-      let rise = bubbleNext ? BUBBLE_RISE : between(def.rise);
-      // No pasarse: lo que falte hasta el anillo tiene que ser un escalón posible.
-      if (top - (y + rise) < def.rise[0] * 0.5) rise = Math.min(def.rise[1], (top - y) / 2);
-      if (bubbleNext && top - (y + rise) < def.rise[0] * 0.5) rise = (top - y) / 2;
-      angle += between(def.step);
-      y += rise;
-      if (!bubbleNext) maxRise = Math.max(maxRise, rise);
-      bubbleNext = false;
-      const size = between(def.size);
-      // Nunca encima del escalón anterior (te golpearías la cabeza al saltar):
-      // si se pisan visto desde arriba, se gira un poco más.
-      const overlapsPrev = (a: number) => {
-        if (!prev) return false;
-        const x = Math.cos(a) * SPIRAL_RADIUS;
-        const z = Math.sin(a) * SPIRAL_RADIUS;
-        return x + size / 2 + 0.15 > prev.minX && x - size / 2 - 0.15 < prev.maxX && z + size / 2 + 0.15 > prev.minZ && z - size / 2 - 0.15 < prev.maxZ;
-      };
-      while (overlapsPrev(angle)) angle += 0.03;
-      const cx = Math.cos(angle) * SPIRAL_RADIUS;
-      const cz = Math.sin(angle) * SPIRAL_RADIUS;
-      n++;
+    /** El paso anterior te lanza (cama elástica, géiser, burbuja): este puede estar bien alto. */
+    let launch: readonly [number, number] | null = null;
 
-      if (def.theme === "cloud" && n % 2 === 0) {
-        // Nube que va y viene a lo largo del camino.
-        const along = Math.abs(Math.sin(angle)) > Math.abs(Math.cos(angle)) ? "x" : "z";
+    let special = 0;
+    let common = 0;
+    const maxStep = def.tall ? def.tall[1] : def.rise[1];
+    while (floorTop - y > maxStep) {
+      n++;
+      // El primer paso de cada piso es común; después, lo especial en ronda.
+      const wanted: Beat = n === 1 ? "step" : def.specials[special % def.specials.length];
+      let beat = wanted;
+      const launched = launch !== null;
+      if (launched && (beat === "ball" || beat === "cloud" || beat === "blink" || beat === "net")) beat = "step";
+      const tall = !launched && beat !== "ball" && def.tall !== undefined && ++common % 3 === 0;
+      let rise = launched ? between(launch!) : beat === "ball" ? between([0.25, 0.6]) : between(tall ? def.tall! : def.rise);
+      launch = null;
+      // No pasarse del descanso: lo que falte tiene que ser una subida posible.
+      if (!launched && floorTop - (y + rise) < def.rise[0] * 0.5) rise = Math.min(maxStep, (floorTop - y) / 2);
+      // Después de un lanzamiento el hueco es más grande: así no te das la cabeza al subir.
+      const gap = launched ? between([1.0, 1.4]) : beat === "ball" ? between([1.1, 1.5]) : between(def.gap);
+      // Lo que lanza (o la red) solo si después queda lugar en el piso; la red, sin dar la vuelta.
+      const big = LAUNCH_RISE[beat];
+      if (big && floorTop - (y + rise) < big[1] + 0.4) beat = "step";
+      if (beat === "net" && (floorTop - (y + rise) < NET_RISE[1] + 0.4 || !fits(2.2, gap))) beat = "step";
+      // Si lo especial no entró, queda para el paso siguiente.
+      if (n > 1 && (beat === wanted || wanted === "step")) special++;
+      if (!launched) maxRise = Math.max(maxRise, rise);
+      y += rise;
+
+      let size = between(def.size);
+      let depth = size;
+      if (beat === "conveyor") {
+        size = 3.0;
+        depth = 1.7;
+      } else if (beat === "trampoline") size = depth = 1.9;
+      else if (beat === "ball") size = depth = 1.4;
+      else if (beat === "spinner") size = depth = 2.4;
+      else if (beat === "net") {
+        size = 2.2;
+        depth = 1.6;
+      }
+
+      const { cx, cz } = place(size, gap, depth, launched ? [1.0, 1.4] : [0.35, 0.7]);
+      let here: Box;
+      let pathId: PathStep;
+
+      if (beat === "cloud") {
+        here = box(cx, y, cz, size, depth, 0.6);
         const cloudId = id++;
-        prev = box(cx, y, cz, size, size, 0.6);
-        movers.push({ id: cloudId, kind: "cloud", box: prev, axis: along, amplitude: 0.9, period: 3 + random() * 1.5, phase: random() * Math.PI * 2, floor: index });
-        path.push({ kind: "mover", id: cloudId, floor: index });
+        movers.push({ id: cloudId, kind: "cloud", box: here, axis: "x", amplitude: 0.9 + random() * 0.3, period: 3 + random() * 1.5, phase: random() * Math.PI * 2, floor: index });
+        pathId = { kind: "mover", id: cloudId, floor: index };
+      } else if (beat === "net") {
+        // El pie (delante) y la columna con la red en la cara de adelante.
+        const foot = add(box(cx, y, cz + depth / 2 + 0.8, size, 1.6), "normal", index);
+        path.push({ kind: "block", id: foot.id, floor: index });
+        const height = between(NET_RISE);
+        const pillar = add({ minX: cx - size / 2, maxX: cx + size / 2, minY: y - THICK, maxY: y + height, minZ: cz - depth / 2, maxZ: cz + depth / 2 }, "pillar", index);
+        // Baranda atrás, arriba de la columna: subiste trepando, no te caés para atrás.
+        add({ minX: pillar.minX, maxX: pillar.maxX, minY: pillar.maxY, maxY: pillar.maxY + 0.7, minZ: pillar.minZ, maxZ: pillar.minZ + 0.25 }, "rail", index);
+        nets.push({ id: id++, floor: index, pillar: pillar.id, minX: pillar.minX, maxX: pillar.maxX, minY: y - 0.1, maxY: pillar.maxY, minZ: pillar.maxZ - 0.05, maxZ: pillar.maxZ + 0.8 });
+        y += height;
+        here = pillar;
+        pathId = { kind: "block", id: pillar.id, floor: index };
       } else {
         const kind: BlockKind =
-          def.theme === "soap" && random() < 0.75 ? "soap" : def.theme === "bubble" && n % 3 === 0 ? "bubble" : "normal";
-        const block = add(box(cx, y, cz, size, size), kind, index);
-        prev = block;
-        path.push({ kind: "block", id: block.id, floor: index });
-        if (kind === "bubble") bubbleNext = true;
-        if (def.theme === "sweeper" && n % 2 === 0) {
-          // Barredora de goma que cruza el escalón.
-          const along = Math.abs(Math.sin(angle)) > Math.abs(Math.cos(angle)) ? "z" : "x";
-          const long = size + 0.4;
-          movers.push({
-            id: id++,
-            kind: "sweeper",
-            box: { minX: cx - (along === "x" ? 0.25 : long / 2), maxX: cx + (along === "x" ? 0.25 : long / 2), minY: y + 0.15, maxY: y + 0.75, minZ: cz - (along === "z" ? 0.25 : long / 2), maxZ: cz + (along === "z" ? 0.25 : long / 2) },
-            axis: along,
-            amplitude: size / 2 + 0.3,
-            period: 2.2 + random() * 0.8,
-            phase: random() * Math.PI * 2,
-            floor: index,
-          });
+          beat === "soap" ? "soap"
+          : beat === "conveyor" ? "conveyor"
+          : beat === "trampoline" ? "trampoline"
+          : beat === "crumble" ? "crumble"
+          : beat === "ball" ? "ball"
+          : beat === "bubble" ? "bubble"
+          : beat === "spinner" ? "spinner"
+          : beat === "blink" ? "blink"
+          : "normal";
+        const extra: Partial<Block> = {};
+        if (kind === "conveyor") extra.belt = (random() < 0.5 ? 1 : -1) * 2.2;
+        if (kind === "spinner") extra.spin = (random() < 0.5 ? 1 : -1) * (0.8 + random() * 0.4);
+        if (kind === "blink") {
+          extra.period = 3 + random() * 0.6;
+          extra.phase = random();
         }
-        if (def.theme === "wind" && n % 2 === 1) {
-          winds.push({ ...box(cx, y + 3, cz, size + 1, size + 1, 3.2), dirX: Math.cos(angle), dirZ: Math.sin(angle), period: 3.5 + random(), phase: random() * Math.PI * 2, floor: index });
+        const thick = kind === "trampoline" ? 0.35 : kind === "ball" ? 0.6 : THICK;
+        const block = add(box(cx, y, cz, size, depth, thick), kind, index, extra);
+        here = block;
+        pathId = { kind: "block", id: block.id, floor: index };
+        if (LAUNCH_RISE[beat]) launch = LAUNCH_RISE[beat]!;
+
+        if (beat === "geyser") {
+          const rise = launch!;
+          geysers.push({ id: id++, floor: index, period: 3.2 + random() * 0.6, phase: random(), minX: cx - 0.7, maxX: cx + 0.7, minZ: cz - 0.7, maxZ: cz + 0.7, minY: y, maxY: y + rise[1] + 2 });
+        }
+        if (beat === "fan") {
+          // Ventilador: para afuera (a la pileta) o en contra del camino.
+          const out = n % 12 === 4;
+          winds.push({ id: id++, ...box(cx, y + 3, cz, size + 1, depth + 1, 3.2), dirX: out ? 0 : -dir, dirZ: out ? 1 : 0, period: 3.4 + random(), phase: random() * Math.PI * 2, floor: index });
+        }
+        if (beat === "hammer" || (beat === "piston" && cz > 3)) {
+          // Martillo de goma colgado: va y viene a lo largo del camino.
+          const length = 3.2;
+          movers.push({ id: id++, kind: "hammer", box: { minX: cx - 0.45, maxX: cx + 0.45, minY: y + 0.35, maxY: y + 1.35, minZ: cz - 0.65, maxZ: cz + 0.65 }, axis: "x", amplitude: size / 2 + 0.5, period: 2.4 + random() * 0.8, phase: random() * Math.PI * 2, floor: index, length });
+        } else if (beat === "piston") {
+          // Guante de box: guardado en la pared, sale hasta el borde de afuera de la plataforma.
+          const reach = block.maxZ - 0.35;
+          movers.push({ id: id++, kind: "piston", box: { minX: cx - 0.55, maxX: cx + 0.55, minY: y + 0.2, maxY: y + 1.3, minZ: -1.3, maxZ: -0.1 }, axis: "z", amplitude: reach + 0.1, period: 2.6 + random() * 0.8, phase: random(), floor: index });
+        } else if (def.theme === "nets" && beat === "step" && n > 1) {
+          // Cañón de espuma en la pared: tira para afuera, por arriba de la plataforma.
+          cannons.push({ id: id++, x: cx, y: y + 0.9, z: 0.2, dx: 0, dy: 0, dz: 1, range: block.maxZ + 1.5, speed: 7.5, period: 2.4 + random() * 0.6, phase: random(), floor: index });
+        } else if (beat === "sweeper") {
+          // Barredora que cruza de la pared para afuera.
+          movers.push({ id: id++, kind: "sweeper", box: { minX: cx - size / 2 - 0.2, maxX: cx + size / 2 + 0.2, minY: y + 0.15, maxY: y + 0.75, minZ: cz - 0.25, maxZ: cz + 0.25 }, axis: "z", amplitude: depth / 2 + 0.3, period: 2.2 + random() * 0.8, phase: random() * Math.PI * 2, floor: index });
         }
       }
-      // Fichas en el camino (una cada dos escalones).
-      if (n % 2 === 0) spots.push({ id: id++, x: cx, y: y + 0.5, z: cz, floor: index, ledge: false });
-      // Cornisas afuera del camino, con premio.
-      if (n % 5 === 3 && def.theme !== "cloud") {
-        const lx = Math.cos(angle + 0.12) * (SPIRAL_RADIUS + 2.7);
-        const lz = Math.sin(angle + 0.12) * (SPIRAL_RADIUS + 2.7);
-        add(box(lx, y + 0.6, lz, 1.4, 1.4), "ledge", index);
-        spots.push({ id: id++, x: lx, y: y + 1.1, z: lz, floor: index, ledge: true });
+      path.push(pathId);
+      prev = here;
+
+      // Fichas en el camino (una cada dos pasos).
+      if (n % 2 === 0) spots.push({ id: id++, x: cx, y: here.maxY + 0.6, z: (here.minZ + here.maxZ) / 2, floor: index, ledge: false });
+      // Cornisas en el otro carril, con premio.
+      // Solo cerca del medio: así las filas que pasan por arriba y por abajo quedan lejos.
+      if (n % 5 === 3 && def.theme !== "sky" && beat !== "net" && Math.abs(cx) < 5.5) {
+        const lz = cz < 3 ? 5.1 : 1.0;
+        add(box(cx, y + 0.7, lz, 1.4, 1.4), "ledge", index);
+        spots.push({ id: id++, x: cx, y: y + 1.2, z: lz, floor: index, ledge: true });
       }
     }
-    // Anillo de descanso arriba del piso: rodea la columna (se llega desde cualquier lado).
-    maxRise = Math.max(maxRise, top - y);
-    y = top;
-    rests.push(top);
-    let nearest: Block | null = null;
-    for (let k = 0; k < 10; k++) {
-      const a = (k / 10) * Math.PI * 2;
-      const ring = add(box(Math.cos(a) * RING_RADIUS, top, Math.sin(a) * RING_RADIUS, RING_BLOCK, RING_BLOCK), index === FLOOR_DEFS.length - 1 ? "goal" : "rest", index);
-      // En el camino, el pedazo de anillo que queda más cerca de donde venías.
-      const da = Math.abs(((a - angle) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
-      const dn = nearest ? Math.abs(((Math.atan2((nearest.minZ + nearest.maxZ) / 2, (nearest.minX + nearest.maxX) / 2) - angle) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI) : Infinity;
-      if (da < dn) nearest = ring;
+
+    // Descanso al final del piso: una plataforma ancha en su carril. Siempre
+    // sigue de largo (en las puntas queda como balcón).
+    maxRise = Math.max(maxRise, floorTop - y);
+    y = floorTop;
+    const gap = between(def.gap);
+    const edge = dir > 0 ? prev.maxX : prev.minX;
+    const rx = edge + dir * (gap + REST_WIDTH / 2);
+    const last = index === FLOOR_DEFS.length - 1;
+    const rest = add({ minX: rx - REST_WIDTH / 2, maxX: rx + REST_WIDTH / 2, minY: y - THICK, maxY: y, minZ: REST_Z[lane][0], maxZ: REST_Z[lane][1] }, last ? "goal" : "rest", index);
+    path.push({ kind: "block", id: rest.id, floor: index });
+    rests.push(floorTop);
+    restSpots.push(centerOf(rest));
+    prev = rest;
+    straight = true;
+    // En las puntas da la vuelta: otro sentido y otro carril (si no, pasaría por arriba de la fila de recién).
+    if (Math.abs(rx) + REST_WIDTH / 2 > EDGE) {
+      dir = dir > 0 ? -1 : 1;
+      lane = 1 - lane;
     }
-    if (nearest) path.push({ kind: "block", id: nearest.id, floor: index });
-    // Del anillo se sale para cualquier lado, pero el primer escalón del piso
-    // siguiente no puede quedar encima del último de este (`prev` sigue siendo ese).
-    floors.push({ index, name: def.name, theme: def.theme, bottom, top, needJump: maxRise + 0.12 });
+    floors.push({ index, name: def.name, theme: def.theme, bottom, top: floorTop, needJump: maxRise + 0.12 });
+    bottom = floorTop;
   });
 
   return {
@@ -228,32 +436,74 @@ export function buildTower(seed = 7): Tower {
     path,
     movers,
     winds,
+    cannons,
+    geysers,
+    nets,
     spots,
     floors,
-    columnRadius: COLUMN_RADIUS,
-    top: y,
+    top,
     rests,
-    start: { x: -12, y: 0, z: 0 },
-    kiosk: { x: -15.2, y: 0, z: -2.6 },
+    restSpots,
+    start: { x: -17, y: 0, z: 3.6 },
+    kiosk: { x: -22.5, y: 0, z: 1.8 },
     elevator,
+    wall,
   };
 }
 
-/** Posición de una barredora o nube en el tiempo `t`. */
+const frac = (v: number) => ((v % 1) + 1) % 1;
+
+/** Cuánto salió el guante (0 guardado, 1 afuera): sale rápido, espera y vuelve. */
+export function punch(t: number, period: number, phase: number): number {
+  const u = frac(t / period + phase);
+  if (u < 0.1) return u / 0.1;
+  if (u < 0.3) return 1;
+  if (u < 0.55) return 1 - (u - 0.3) / 0.25;
+  return 0;
+}
+
+/** Desplazamiento de un móvil en el tiempo `t`. */
 export function moverOffset(m: Mover, t: number): number {
+  if (m.kind === "piston") return m.amplitude * punch(t, m.period, m.phase);
   return m.amplitude * Math.sin((t / m.period) * Math.PI * 2 + m.phase);
+}
+
+/** Velocidad del móvil a lo largo de su eje (para saber para dónde te tira). */
+export function moverVelocity(m: Mover, t: number): number {
+  const h = 1 / 240;
+  return (moverOffset(m, t + h) - moverOffset(m, t - h)) / (2 * h);
 }
 
 export function moverBox(m: Mover, t: number): Box {
   const d = moverOffset(m, t);
-  return m.axis === "x"
-    ? { ...m.box, minX: m.box.minX + d, maxX: m.box.maxX + d }
-    : { ...m.box, minZ: m.box.minZ + d, maxZ: m.box.maxZ + d };
+  // El martillo es un péndulo: en las puntas sube un poco.
+  const lift = m.kind === "hammer" && m.length ? m.length - Math.sqrt(Math.max(0, m.length * m.length - d * d)) : 0;
+  const moved = m.axis === "x" ? { ...m.box, minX: m.box.minX + d, maxX: m.box.maxX + d } : { ...m.box, minZ: m.box.minZ + d, maxZ: m.box.maxZ + d };
+  return lift ? { ...moved, minY: moved.minY + lift, maxY: moved.maxY + lift } : moved;
 }
 
-/** ¿Sopla el viento ahora? (ráfagas: un rato sí, un rato no). */
+/** ¿Sopla el ventilador ahora? (ráfagas: un rato sí, un rato no). */
 export function windBlowing(w: Wind, t: number): boolean {
   return Math.sin((t / w.period) * Math.PI * 2 + w.phase) > 0.15;
+}
+
+/** ¿Está la plataforma parpadeante? */
+export const blinkOn = (b: Block, t: number) => frac(t / (b.period ?? 3) + (b.phase ?? 0)) < 0.68;
+/** Cuánto falta para que desaparezca (0 a 1; 1 = recién apareció). */
+export const blinkLeft = (b: Block, t: number) => Math.max(0, 1 - frac(t / (b.period ?? 3) + (b.phase ?? 0)) / 0.68);
+
+/** Momento del ciclo del géiser (0 a 1): sale fuerte al principio y avisa al final. */
+export const geyserPhase = (g: Geyser, t: number) => frac(t / g.period + g.phase);
+export const geyserOn = (g: Geyser, t: number) => geyserPhase(g, t) < 0.42;
+export const geyserWarn = (g: Geyser, t: number) => geyserPhase(g, t) > 0.8;
+
+export const CANNON_BALL = 0.4;
+
+/** Dónde está la pelota del cañón ahora (null si no hay ninguna en el aire). */
+export function cannonBall(c: Cannon, t: number): Vec3 | null {
+  const travel = frac(t / c.period + c.phase) * c.period * c.speed;
+  if (travel > c.range) return null;
+  return { x: c.x + c.dx * travel, y: c.y + c.dy * travel, z: c.z + c.dz * travel };
 }
 
 export function floorAt(tower: Tower, y: number): number {

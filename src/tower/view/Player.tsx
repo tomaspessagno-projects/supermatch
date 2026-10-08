@@ -13,8 +13,8 @@ import { INK, PALETTE, toon } from "./toon";
  * El concursante en 3D, armado con piezas (como el títere 2D, pero con
  * volumen): cabeza grande con vincha, camiseta del equipo, codos y rodillas.
  * La animación es por código y sigue a la simulación: correr, saltar
- * (rodillas recogidas al subir), caer, planear con el flotador, el golpe de
- * la barredora, el resbalón sin energía y el chapuzón.
+ * (rodillas recogidas al subir), caer, planear con el flotador, trepar la
+ * red, volar en el géiser, los golpes, el resbalón sin energía y el chapuzón.
  *
  * Cuando llegue el modelo 3D con esqueleto (Tripo/Meshy + Mixamo), este
  * componente se reemplaza y el resto del juego no cambia.
@@ -129,6 +129,21 @@ export function Player({ frame, teamColor }: { frame: React.RefObject<Frame | nu
       lean = a.spin;
       aL = -2 + Math.sin(t * 20); aR = 2 + Math.cos(t * 17);
       thighL = Math.sin(t * 18) * 0.8; thighR = -Math.sin(t * 18) * 0.8; kL = kR = 0.8;
+      mouthOpen = 1;
+    } else if (p.climbing) {
+      // Trepando la red: mano, mano, pie, pie.
+      const c = Math.sin(t * 9);
+      aL = -2.7 + c * 0.45; aR = -2.7 - c * 0.45;
+      eL = eR = 0.5;
+      spreadL = spreadR = 0.35;
+      thighL = 0.7 + c * 0.45; thighR = 0.7 - c * 0.45; kL = kR = 1.2;
+      mouthOpen = 0.4;
+    } else if (p.lifted) {
+      // En el géiser: brazos arriba y piernas que patalean.
+      aL = aR = -2.9;
+      spreadL = spreadR = 0.5;
+      eL = eR = 0.1;
+      thighL = 0.3 + Math.sin(t * 14) * 0.35; thighR = 0.3 - Math.sin(t * 14) * 0.35; kL = kR = 0.6;
       mouthOpen = 1;
     } else if (p.slipping || (p.exhausted > 0 && p.grounded)) {
       // Sin energía: piernas de gelatina y brazos en molino.

@@ -5,13 +5,16 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { itemDef, MUTATION } from "../sim/items";
-import type { SimEvent } from "../sim/sim";
+import type { HazardKind, SimEvent } from "../sim/sim";
 import { TUNING } from "../sim/tuning";
 import { bus } from "./bus";
 import type { Frame } from "./frame";
 import { INK, PALETTE } from "./toon";
 
 const FONT = "/game/fonts/LuckiestGuy-Regular.ttf";
+
+/** El cartel de cada golpe (solo letras que tiene la fuente). */
+const KNOCK_TEXT: Record<HazardKind, string> = { sweeper: "¡PUM!", hammer: "¡TOING!", piston: "¡PIÑA!", cannon: "¡PAF!" };
 const MAX_PARTICLES = 400;
 
 type Particle = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; max: number; size: number; color: THREE.Color; gravity: number };
@@ -77,11 +80,22 @@ export function Effects({ frame }: { frame: React.RefObject<Frame | null> }) {
             break;
           case "knock":
             burst(e.x, e.y, e.z, 14, [PALETTE.yellow, "#ffffff"], 5, 4, 8, 0.12, 0.6);
-            pop("¡PUM!", PALETTE.yellow, e.x, e.y + 1, e.z, 0.7);
+            pop(KNOCK_TEXT[e.by], PALETTE.yellow, e.x, e.y + 1, e.z, 0.7);
             break;
           case "bounce":
-            burst(p.x, p.y, p.z, 12, [PALETTE.pink, "#ffffff"], 3, 2, 6, 0.1, 0.5);
-            pop("¡BOING!", PALETTE.pink, p.x, p.y + 2, p.z, 0.5);
+            burst(p.x, p.y, p.z, e.big ? 30 : 12, [PALETTE.pink, "#ffffff", PALETTE.yellow], e.big ? 5 : 3, 2, 6, 0.1, 0.6);
+            pop(e.big ? "¡SÚPER BOING!" : "¡BOING!", PALETTE.pink, p.x, p.y + 2, p.z, e.big ? 0.7 : 0.5);
+            break;
+          case "deflate":
+            burst(e.x, e.y + 0.2, e.z, 16, ["#ffffff", "#fed7aa"], 3, 1, 4, 0.1, 0.6);
+            pop("¡FSSS!", "#fb923c", e.x, e.y + 0.8, e.z, 0.45);
+            break;
+          case "lift":
+            burst(p.x, p.y, p.z, 30, [PALETTE.water, "#ffffff"], 2.5, 8, 14, 0.12, 0.9);
+            pop("¡FIUUU!", PALETTE.cyan, p.x, p.y + 2, p.z, 0.55);
+            break;
+          case "mantle":
+            pop("¡ARRIBA!", PALETTE.white, p.x, p.y + 2, p.z, 0.4);
             break;
           case "land":
             if (e.impact > 9) burst(p.x, p.y + 0.05, p.z, 10, ["#ffffff", "#e2e8f0"], 2.5, 1.5, 6, 0.1, 0.4);

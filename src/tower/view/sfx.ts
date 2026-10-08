@@ -2,7 +2,7 @@
  * Sonido con Web Audio: los mismos efectos del programa (public/game/sfx).
  * Arranca con el primer toque o tecla (los navegadores lo exigen).
  */
-const NAMES = ["jump", "land", "splash", "bonk", "checkpoint", "count", "whistle", "finish", "fail", "cheer", "laugh", "pop", "spring", "creak", "wall"] as const;
+const NAMES = ["jump", "land", "splash", "bonk", "checkpoint", "count", "whistle", "finish", "fail", "cheer", "laugh", "pop", "spring", "creak", "wall", "cannon"] as const;
 export type Sfx = (typeof NAMES)[number];
 
 let ctx: AudioContext | null = null;

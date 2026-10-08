@@ -1,5 +1,21 @@
 import { makeItem, type Item, rollItem } from "./items";
-import { type Block, type BlockKind, type Box, floorAt, moverBox, type Tower, windBlowing } from "./level";
+import {
+  type Block,
+  type BlockKind,
+  blinkOn,
+  type Box,
+  CANNON_BALL,
+  cannonBall,
+  centerOf,
+  floorAt,
+  geyserOn,
+  type MoverKind,
+  moverBox,
+  moverVelocity,
+  type Net,
+  type Tower,
+  windBlowing,
+} from "./level";
 import type { Stats } from "./progression";
 import { mulberry32 } from "./random";
 import { TUNING } from "./tuning";
@@ -7,12 +23,15 @@ import { TUNING } from "./tuning";
 /**
  * Simulación de La Torre: TypeScript puro, sin three.js.
  *
- * Un intento: salís de la orilla, trepás el caracol de la torre gastando
+ * Un intento: salís de la orilla, subís la fachada de la torre gastando
  * energía (por salto y por segundo), juntás fichas y objetos (la mochila tiene
  * lugar limitado) y en algún momento te caés a la pileta. Ahí se cobra: los
  * metros que subiste, el récord, las fichas y lo que traías en la mochila.
  * Después volvés a la orilla para el próximo intento.
  */
+
+/** Eventos en vivo: cambian las reglas un rato (los elige el reloj, igual para todos). */
+export type Modifier = "chips2" | "lowgrav" | "gifts" | "fame2";
 
 export type PlayerInput = {
   /** Dirección en el piso (mundo), largo ≤ 1. La vista la calcula según la cámara. */
@@ -24,6 +43,8 @@ export type PlayerInput = {
   jumpHeld: boolean;
 };
 
+export type Ground = BlockKind | "cloud";
+
 export type Player = {
   /** Centro de los pies. */
   x: number;
@@ -33,7 +54,9 @@ export type Player = {
   vy: number;
   vz: number;
   grounded: boolean;
-  ground: BlockKind | "cloud" | null;
+  ground: Ground | null;
+  /** Bloque sobre el que está parado (null en el aire o en una nube). */
+  on: number | null;
   /** Nube sobre la que está parado (lo lleva). */
   riding: number | null;
   coyote: number;
@@ -48,6 +71,12 @@ export type Player = {
   gliding: boolean;
   /** Lo último que pisó fue la orilla o un descanso (ahí no se gasta energía). */
   safe: boolean;
+  /** Trepando una red. */
+  climbing: boolean;
+  /** Después de soltarse saltando, un ratito sin agarrarse. */
+  netCooldown: number;
+  /** Lo está subiendo un géiser. */
+  lifted: boolean;
 };
 
 export type Content = { kind: "chip"; value: number } | { kind: "item"; item: Item };
@@ -75,6 +104,8 @@ export type RunSummary = {
   chips: number;
   items: Item[];
   itemsFame: number;
+  /** Lo que suman la temporada, la mascota y los eventos. */
+  bonusFame: number;
   total: number;
 };
 
@@ -84,6 +115,9 @@ export type Progress = {
   /** Último descanso al que llegaste (índice de piso, -1 = ninguno). */
   highestRest: number;
 };
+
+/** Plataformas que se desinflan: cuándo las pisaron y hasta cuándo están desinfladas. */
+export type CrumbleState = { touched: number; downUntil: number };
 
 export type World = {
   tower: Tower;
@@ -97,13 +131,21 @@ export type World = {
   energy: number;
   run: Run;
   summary: RunSummary | null;
+  modifier: Modifier | null;
+  crumbles: Record<number, CrumbleState>;
 };
+
+export type HazardKind = Exclude<MoverKind, "cloud"> | "cannon";
 
 export type SimEvent =
   | { type: "jump"; double: boolean }
-  | { type: "land"; impact: number; kind: BlockKind | "cloud" }
-  | { type: "bounce" }
-  | { type: "knock"; x: number; y: number; z: number }
+  | { type: "land"; impact: number; kind: Ground }
+  | { type: "bounce"; kind: "bubble" | "trampoline"; big: boolean }
+  | { type: "knock"; x: number; y: number; z: number; by: HazardKind }
+  | { type: "deflate"; x: number; y: number; z: number }
+  | { type: "climb" }
+  | { type: "mantle" }
+  | { type: "lift" }
   | { type: "chip"; value: number; x: number; y: number; z: number }
   | { type: "item"; item: Item; x: number; y: number; z: number }
   | { type: "bagFull"; x: number; y: number; z: number }
@@ -119,18 +161,26 @@ export type SimEvent =
 
 const IDLE: PlayerInput = { moveX: 0, moveZ: 0, jumpPressed: false, jumpHeld: false };
 
-/** Dónde aparecés al subir en ascensor (sobre el anillo, del lado de la orilla). */
-const RING_SPAWN = 3.6;
-
-/** Recarga de un anillo de descanso (una vez por intento). */
+/** Recarga de un descanso (una vez por intento). */
 export const REST_REFILL = 12;
 /** Premio por llegar a la cima. */
 export const TOP_BONUS = 500;
 /** Fama por metro por encima del récord. */
 export const RECORD_FAME_PER_M = 3;
 
-export function createWorld(tower: Tower, stats: Stats, progress: Progress, seed = 1): World {
-  const world: World = {
+const byId = new WeakMap<Tower, Map<number, Block>>();
+/** Bloque por id (con un índice armado una vez por torre). */
+export function blockOf(tower: Tower, id: number): Block | undefined {
+  let map = byId.get(tower);
+  if (!map) {
+    map = new Map(tower.blocks.map((b) => [b.id, b]));
+    byId.set(tower, map);
+  }
+  return map.get(id);
+}
+
+export function createWorld(tower: Tower, stats: Stats, progress: Progress, seed = 1, modifier: Modifier | null = null): World {
+  return {
     tower,
     stats,
     progress: { ...progress },
@@ -140,10 +190,11 @@ export function createWorld(tower: Tower, stats: Stats, progress: Progress, seed
     phaseTime: 0,
     player: newPlayer(tower.start.x, tower.start.y, tower.start.z),
     energy: stats.energy,
-    run: newRun(tower, seed, 0, tower.start.y),
+    run: newRun(tower, seed, 0, tower.start.y, modifier),
     summary: null,
+    modifier,
+    crumbles: {},
   };
-  return world;
 }
 
 function newPlayer(x: number, y: number, z: number): Player {
@@ -156,26 +207,31 @@ function newPlayer(x: number, y: number, z: number): Player {
     vz: 0,
     grounded: true,
     ground: "deck",
+    on: null,
     riding: null,
     coyote: 0,
     jumpBuffer: 0,
     usedDouble: false,
     stun: 0,
-    facing: Math.PI / 2, // mirando a la torre (+x)
+    facing: Math.PI / 2, // mirando para el lado de la torre (+x)
     exhausted: 0,
     slipping: false,
     gliding: false,
     safe: true,
+    climbing: false,
+    netCooldown: 0,
+    lifted: false,
   };
 }
 
 /** Sortea qué hay en cada lugar: fichas en el camino, objetos en las cornisas. */
-function newRun(tower: Tower, seed: number, number: number, startY: number): Run {
+function newRun(tower: Tower, seed: number, number: number, startY: number, modifier: Modifier | null): Run {
   const random = mulberry32(seed * 7919 + number * 104729);
+  const gifts = modifier === "gifts";
   const contents: Record<number, Content> = {};
   for (const spot of tower.spots) {
     if (spot.ledge) {
-      if (random() < 0.7) contents[spot.id] = { kind: "item", item: rollItem(random, spot.floor) };
+      if (gifts || random() < 0.7) contents[spot.id] = { kind: "item", item: rollItem(random, spot.floor, gifts ? 3 : 1) };
     } else if (random() < 0.65) {
       contents[spot.id] = { kind: "chip", value: spot.floor + 1 };
     }
@@ -196,55 +252,96 @@ export function step(w: World, rawInput: PlayerInput, dt: number): SimEvent[] {
   const p = w.player;
   const input = p.stun > 0 || p.slipping ? IDLE : rawInput;
   p.stun = Math.max(0, p.stun - dt);
-  stepEnergy(w, input, dt, events);
-  moveHorizontal(w, input, dt);
+  p.netCooldown = Math.max(0, p.netCooldown - dt);
+  stepEnergy(w, dt, events);
+  climb(w, input, events);
+  if (!p.climbing) moveHorizontal(w, input, dt);
   jumpAndGravity(w, input, dt, events);
+  geysers(w, events);
   integrate(w, dt, events);
-  hitSweepers(w, events);
+  crumble(w, events);
+  hazards(w, events);
   pickUp(w, events);
   checkPlaces(w, events);
 
-  if (Math.abs(p.vx) + Math.abs(p.vz) > 0.5) p.facing = Math.atan2(p.vx, p.vz);
+  if (!p.climbing && Math.abs(p.vx) + Math.abs(p.vz) > 0.5) p.facing = Math.atan2(p.vx, p.vz);
   if (p.y < TUNING.waterY) splash(w, events);
   return events;
 }
 
-const SAFE: readonly (BlockKind | "cloud" | null)[] = ["deck", "rest", "elevator"];
-const onSafeGround = (p: Player) => p.safe;
+const SAFE: readonly (Ground | null)[] = ["deck", "rest", "elevator", "goal"];
 
-function stepEnergy(w: World, input: PlayerInput, dt: number, events: SimEvent[]) {
+function stepEnergy(w: World, dt: number, events: SimEvent[]) {
   const p = w.player;
   // En la orilla y en los descansos no se gasta.
-  if (!onSafeGround(p) && w.energy > 0) {
-    w.energy = Math.max(0, w.energy - TUNING.drainPerSecond * dt);
+  if (!p.safe && w.energy > 0) {
+    const drain = (TUNING.drainPerSecond + (p.climbing ? TUNING.climbDrain : 0)) * w.stats.drainMult;
+    w.energy = Math.max(0, w.energy - drain * dt);
     if (w.energy === 0) events.push({ type: "exhausted" });
   }
   if (w.energy > 0) {
     p.exhausted = 0;
     return;
   }
-  if (onSafeGround(p)) return;
+  if (p.safe) return;
   p.exhausted += dt;
   if (!p.slipping && p.exhausted >= TUNING.exhaustedFor) {
     p.slipping = true;
+    p.climbing = false;
     events.push({ type: "slip" });
   }
-  void input;
+}
+
+function touchingNet(w: World): Net | null {
+  const p = w.player;
+  for (const n of w.tower.nets) {
+    if (p.x > n.minX - 0.1 && p.x < n.maxX + 0.1 && p.z >= n.minZ && p.z <= n.maxZ && p.y >= n.minY - 0.4 && p.y < n.maxY) return n;
+  }
+  return null;
+}
+
+/** Redes: apretando hacia la pared (adelante) se trepa; arriba se sube al borde solo. */
+function climb(w: World, input: PlayerInput, events: SimEvent[]) {
+  const p = w.player;
+  const net = p.netCooldown > 0 ? null : touchingNet(w);
+  if (!net || input.moveZ > -0.35 || w.energy <= 0 || p.slipping) {
+    p.climbing = false;
+    return;
+  }
+  if (p.y >= net.maxY - 0.15) {
+    // Arriba de todo: se sube al borde (un saltito para adentro).
+    if (p.climbing) {
+      p.climbing = false;
+      p.vy = TUNING.mantleSpeed;
+      p.vz = -TUNING.mantlePush;
+      events.push({ type: "mantle" });
+    }
+    return;
+  }
+  if (!p.climbing) events.push({ type: "climb" });
+  p.climbing = true;
+  p.grounded = false;
+  p.on = null;
+  p.riding = null;
+  p.usedDouble = false;
+  p.vx = input.moveX * TUNING.climbSide;
+  p.vz = -1.5;
+  p.vy = TUNING.climbSpeed;
+  p.facing = Math.PI;
 }
 
 function moveHorizontal(w: World, input: PlayerInput, dt: number) {
   const p = w.player;
   if (p.slipping) {
-    // Sin piernas: se va resbalando para afuera de la torre.
-    const d = Math.sqrt(p.x * p.x + p.z * p.z) || 1;
-    p.vx = (p.x / d) * TUNING.slipSpeed;
-    p.vz = (p.z / d) * TUNING.slipSpeed;
+    // Sin piernas: se va resbalando para afuera, a la pileta.
+    p.vx *= 0.9;
+    p.vz = TUNING.slipSpeed;
     return;
   }
   const len = Math.sqrt(input.moveX * input.moveX + input.moveZ * input.moveZ);
   const scale = len > 1 ? 1 / len : 1;
   const grip = w.stats.grip;
-  // Viento: cuando sopla, te arrastra para afuera (el agarre lo aguanta mejor).
+  // Ventiladores: cuando soplan, te arrastran (el agarre lo aguanta mejor).
   let driftX = 0;
   let driftZ = 0;
   for (const wind of w.tower.winds) {
@@ -253,12 +350,23 @@ function moveHorizontal(w: World, input: PlayerInput, dt: number) {
     driftX += wind.dirX * force;
     driftZ += wind.dirZ * force;
   }
+  // La bola roja es redonda: si no estás en el medio, te vas cayendo para el costado.
+  const block = p.grounded && p.on !== null ? blockOf(w.tower, p.on) : undefined;
+  if (block?.kind === "ball") {
+    const c = centerOf(block);
+    driftX += (p.x - c.x) * TUNING.ballRoll;
+    driftZ += (p.z - c.z) * TUNING.ballRoll;
+  }
   const tx = input.moveX * scale * TUNING.moveSpeed + driftX;
   const tz = input.moveZ * scale * TUNING.moveSpeed + driftZ;
   const soapy = p.grounded && p.ground === "soap";
+  const ball = p.grounded && p.ground === "ball";
+  const pushing = len > 0.01 || driftX !== 0 || driftZ !== 0;
   let rate: number;
-  if (len > 0.01 || driftX !== 0 || driftZ !== 0) rate = !p.grounded ? TUNING.airAccel : soapy ? TUNING.soapAccel + grip * 4 : TUNING.groundAccel;
-  else rate = !p.grounded ? TUNING.airDecel : soapy ? TUNING.soapDecel + grip * 2 : TUNING.groundDecel;
+  if (!p.grounded) rate = pushing ? TUNING.airAccel : TUNING.airDecel;
+  else if (soapy) rate = pushing ? TUNING.soapAccel + grip * 4 : TUNING.soapDecel + grip * 2;
+  else if (ball) rate = (pushing ? TUNING.ballAccel : TUNING.ballDecel) + grip * 4;
+  else rate = pushing ? TUNING.groundAccel : TUNING.groundDecel;
   const dx = tx - p.vx;
   const dz = tz - p.vz;
   const dist = Math.sqrt(dx * dx + dz * dz);
@@ -270,7 +378,6 @@ function moveHorizontal(w: World, input: PlayerInput, dt: number) {
     p.vx += (dx / dist) * max;
     p.vz += (dz / dist) * max;
   }
-
 }
 
 function jumpAndGravity(w: World, input: PlayerInput, dt: number, events: SimEvent[]) {
@@ -279,11 +386,21 @@ function jumpAndGravity(w: World, input: PlayerInput, dt: number, events: SimEve
   p.jumpBuffer = input.jumpPressed ? TUNING.jumpBuffer : Math.max(0, p.jumpBuffer - dt);
   const canJump = w.energy > 0 && !p.slipping;
   if (p.jumpBuffer > 0 && canJump) {
-    if (p.coyote > 0) {
+    if (p.climbing) {
+      // Se suelta de la red saltando para atrás.
+      p.climbing = false;
+      p.netCooldown = TUNING.netCooldown;
+      p.vy = w.stats.jumpSpeed * 0.85;
+      p.vz = TUNING.netJumpOut;
+      p.jumpBuffer = 0;
+      spend(w, events);
+      events.push({ type: "jump", double: false });
+    } else if (p.coyote > 0) {
       p.vy = w.stats.jumpSpeed;
       p.grounded = false;
       p.coyote = 0;
       p.jumpBuffer = 0;
+      p.on = null;
       p.riding = null;
       spend(w, events);
       events.push({ type: "jump", double: false });
@@ -295,37 +412,68 @@ function jumpAndGravity(w: World, input: PlayerInput, dt: number, events: SimEve
       events.push({ type: "jump", double: true });
     }
   }
-  p.vy = Math.max(-TUNING.maxFallSpeed, p.vy - TUNING.gravity * dt);
+  if (p.climbing) {
+    p.gliding = false;
+    return;
+  }
+  const gravity = TUNING.gravity * (w.modifier === "lowgrav" ? TUNING.lowGravity : 1);
+  p.vy = Math.max(-TUNING.maxFallSpeed, p.vy - gravity * dt);
   p.gliding = w.stats.float && !p.grounded && input.jumpHeld && p.vy < -TUNING.glideFallSpeed;
   if (p.gliding) p.vy = -TUNING.glideFallSpeed;
 }
 
 function spend(w: World, events: SimEvent[]) {
-  if (onSafeGround(w.player)) return;
+  // Desde la orilla o un descanso (y en el aire después de salir de ahí) no se gasta.
+  if (w.player.safe) return;
   const before = w.energy;
-  w.energy = Math.max(0, w.energy - TUNING.jumpCost);
+  w.energy = Math.max(0, w.energy - TUNING.jumpCost * w.stats.drainMult);
   if (before > 0 && w.energy === 0) events.push({ type: "exhausted" });
+}
+
+/** Géiseres: mientras salen, si estás en el chorro te suben. */
+function geysers(w: World, events: SimEvent[]) {
+  const p = w.player;
+  let lifted = false;
+  for (const g of w.tower.geysers) {
+    if (!geyserOn(g, w.time)) continue;
+    if (p.x > g.minX && p.x < g.maxX && p.z > g.minZ && p.z < g.maxZ && p.y >= g.minY - 0.2 && p.y < g.maxY) {
+      lifted = true;
+      p.vy = Math.max(p.vy, TUNING.geyserSpeed);
+      p.grounded = false;
+      p.on = null;
+    }
+  }
+  if (lifted && !p.lifted) events.push({ type: "lift" });
+  p.lifted = lifted;
 }
 
 const inside = (b: Box, x: number, y: number, z: number) =>
   x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY && z >= b.minZ && z <= b.maxZ;
 
-type Solid = { box: Box; kind: BlockKind | "cloud"; mover: number | null };
+type Solid = { box: Box; kind: Ground; id: number; mover: boolean };
 
-/** Lo sólido cerca del jugador: bloques fijos y nubes donde están ahora. */
+/** ¿Se puede pisar este bloque ahora? (las parpadeantes y las desinfladas, no). */
+export function solidNow(w: World, b: Block): boolean {
+  if (b.kind === "elevator") return false; // es un dibujo en el piso del muelle
+  if (b.kind === "blink") return blinkOn(b, w.time);
+  if (b.kind === "crumble") return w.time >= (w.crumbles[b.id]?.downUntil ?? 0);
+  return true;
+}
+
+/** Lo sólido cerca del jugador: bloques y nubes donde están ahora. */
 function solidsNear(w: World): Solid[] {
   const p = w.player;
   const out: Solid[] = [];
   for (const b of w.tower.blocks) {
     if (b.maxY < p.y - 3 || b.minY > p.y + 4) continue;
-    if (b.kind === "elevator") continue; // es un dibujo en el piso del muelle
-    out.push({ box: b, kind: b.kind, mover: null });
+    if (!solidNow(w, b)) continue;
+    out.push({ box: b, kind: b.kind, id: b.id, mover: false });
   }
   for (const m of w.tower.movers) {
     if (m.kind !== "cloud") continue;
     const box = moverBox(m, w.time);
     if (box.maxY < p.y - 3 || box.minY > p.y + 4) continue;
-    out.push({ box, kind: "cloud", mover: m.id });
+    out.push({ box, kind: "cloud", id: m.id, mover: true });
   }
   return out;
 }
@@ -335,7 +483,7 @@ function integrate(w: World, dt: number, events: SimEvent[]) {
   const r = TUNING.playerRadius;
   const h = TUNING.playerHeight;
 
-  // Parado sobre una nube: se mueve con ella.
+  // Lo que te lleva: la nube, la cinta, la calesita.
   if (p.grounded && p.riding !== null) {
     const m = w.tower.movers.find((x) => x.id === p.riding);
     if (m) {
@@ -343,6 +491,18 @@ function integrate(w: World, dt: number, events: SimEvent[]) {
       const before = moverBox(m, w.time - dt);
       p.x += now.minX - before.minX;
       p.z += now.minZ - before.minZ;
+    }
+  } else if (p.grounded && p.on !== null) {
+    const b = blockOf(w.tower, p.on);
+    if (b?.kind === "conveyor") p.x += (b.belt ?? 0) * dt;
+    if (b?.kind === "spinner") {
+      const c = centerOf(b);
+      const a = (b.spin ?? 0) * dt;
+      const dx = p.x - c.x;
+      const dz = p.z - c.z;
+      p.x = c.x + dx * Math.cos(a) + dz * Math.sin(a);
+      p.z = c.z - dx * Math.sin(a) + dz * Math.cos(a);
+      p.facing += a;
     }
   }
 
@@ -370,15 +530,22 @@ function integrate(w: World, dt: number, events: SimEvent[]) {
   const wasGrounded = p.grounded;
   p.grounded = landed !== null;
   p.ground = landed?.kind ?? null;
-  p.riding = landed?.mover ?? null;
+  p.on = landed && !landed.mover ? landed.id : null;
+  p.riding = landed?.mover ? landed.id : null;
   if (landed) {
     p.usedDouble = false;
+    p.climbing = false;
     p.safe = SAFE.includes(landed.kind);
     if (!wasGrounded) events.push({ type: "land", impact: -vyBefore, kind: landed.kind });
-    if (landed.kind === "bubble") {
-      p.vy = TUNING.bounceSpeed;
+    if (landed.kind === "bubble" || landed.kind === "trampoline") {
+      // Rebota; si venías con el salto apretado, más alto.
+      const big = p.jumpBuffer > 0;
+      const speed = landed.kind === "bubble" ? TUNING.bounceSpeed : TUNING.trampolineSpeed;
+      p.vy = speed * (big ? TUNING.superBounce : 1);
+      p.jumpBuffer = 0;
       p.grounded = false;
-      events.push({ type: "bounce" });
+      p.on = null;
+      events.push({ type: "bounce", kind: landed.kind, big });
     }
     if (!p.slipping) w.run.maxY = Math.max(w.run.maxY, p.y);
   }
@@ -402,39 +569,59 @@ function integrate(w: World, dt: number, events: SimEvent[]) {
     else continue;
     p.vz = 0;
   }
+}
 
-  // La columna del medio (cilindro).
-  const d = Math.sqrt(p.x * p.x + p.z * p.z);
-  const min = w.tower.columnRadius + r;
-  if (d < min && p.y < w.tower.top + 2 && d > 0) {
-    p.x = (p.x / d) * min;
-    p.z = (p.z / d) * min;
-    const inward = (p.vx * p.x + p.vz * p.z) / min;
-    if (inward < 0) {
-      p.vx -= (inward * p.x) / min;
-      p.vz -= (inward * p.z) / min;
-    }
+/** Las que se desinflan: aguantan un ratito desde que las pisás y después vuelven. */
+function crumble(w: World, events: SimEvent[]) {
+  const p = w.player;
+  if (p.grounded && p.ground === "crumble" && p.on !== null) {
+    const c = (w.crumbles[p.on] ??= { touched: -1, downUntil: 0 });
+    if (c.touched < 0) c.touched = w.time;
+  }
+  for (const [key, c] of Object.entries(w.crumbles)) {
+    if (c.touched < 0 || w.time - c.touched < TUNING.crumbleDelay) continue;
+    c.touched = -1;
+    c.downUntil = w.time + TUNING.crumbleDown;
+    const b = blockOf(w.tower, Number(key));
+    if (b) events.push({ type: "deflate", ...centerOf(b) });
   }
 }
 
-function hitSweepers(w: World, events: SimEvent[]) {
+/** Barredoras, martillos, guantes y cañones: si te tocan, volás. */
+function hazards(w: World, events: SimEvent[]) {
   const p = w.player;
   if (p.stun > 0) return;
   const r = TUNING.playerRadius;
-  for (const m of w.tower.movers) {
-    if (m.kind !== "sweeper") continue;
-    const b = moverBox(m, w.time);
-    const hit = p.x + r > b.minX && p.x - r < b.maxX && p.y + TUNING.playerHeight > b.minY && p.y < b.maxY && p.z + r > b.minZ && p.z - r < b.maxZ;
-    if (!hit) continue;
-    // Te tira para donde va la barredora.
-    const dir = Math.cos((w.time / m.period) * Math.PI * 2 + m.phase) >= 0 ? 1 : -1;
-    p.vx = m.axis === "x" ? dir * TUNING.knockSpeed : p.vx * 0.3;
-    p.vz = m.axis === "z" ? dir * TUNING.knockSpeed : p.vz * 0.3;
+  const h = TUNING.playerHeight;
+  const hit = (by: HazardKind, vx: number, vz: number) => {
+    p.vx = vx;
+    p.vz = vz;
     p.vy = TUNING.knockLift;
     p.grounded = false;
+    p.climbing = false;
+    p.on = null;
+    p.riding = null;
     p.stun = TUNING.stunTime;
-    events.push({ type: "knock", x: p.x, y: p.y + 1, z: p.z });
-    return;
+    events.push({ type: "knock", x: p.x, y: p.y + 1, z: p.z, by });
+  };
+  for (const m of w.tower.movers) {
+    if (m.kind === "cloud") continue;
+    const b = moverBox(m, w.time);
+    const touching = p.x + r > b.minX && p.x - r < b.maxX && p.y + h > b.minY && p.y < b.maxY && p.z + r > b.minZ && p.z - r < b.maxZ;
+    if (!touching) continue;
+    if (m.kind === "piston") return hit("piston", p.vx * 0.3, TUNING.pistonKnock);
+    // Te tira para donde va.
+    const dir = moverVelocity(m, w.time) >= 0 ? 1 : -1;
+    return hit(m.kind, m.axis === "x" ? dir * TUNING.knockSpeed : p.vx * 0.3, m.axis === "z" ? dir * TUNING.knockSpeed : p.vz * 0.3);
+  }
+  for (const c of w.tower.cannons) {
+    const ball = cannonBall(c, w.time);
+    if (!ball) continue;
+    const dx = ball.x - p.x;
+    const dz = ball.z - p.z;
+    const reach = CANNON_BALL + r;
+    if (dx * dx + dz * dz > reach * reach || ball.y < p.y - CANNON_BALL || ball.y > p.y + h + CANNON_BALL) continue;
+    return hit("cannon", c.dx * TUNING.knockSpeed, c.dz * TUNING.knockSpeed);
   }
 }
 
@@ -450,9 +637,10 @@ function pickUp(w: World, events: SimEvent[]) {
     const dz = spot.z - p.z;
     if (dx * dx + dy * dy + dz * dz > (radius + 0.4) * (radius + 0.4)) continue;
     if (content.kind === "chip") {
-      w.run.chips += content.value;
+      const value = Math.round(content.value * w.stats.chipMult * (w.modifier === "chips2" ? 2 : 1));
+      w.run.chips += value;
       delete w.run.contents[spot.id];
-      events.push({ type: "chip", value: content.value, x: spot.x, y: spot.y, z: spot.z });
+      events.push({ type: "chip", value, x: spot.x, y: spot.y, z: spot.z });
     } else if (w.run.bag.length < w.stats.bag) {
       w.run.bag.push(content.item);
       delete w.run.contents[spot.id];
@@ -493,17 +681,12 @@ function checkPlaces(w: World, events: SimEvent[]) {
   }
   // El ascensor del muelle: al último descanso al que llegaste.
   const el = tower.elevator;
-  if (
-    p.ground === "deck" &&
-    w.stats.elevator &&
-    w.progress.highestRest >= 0 &&
-    p.x > el.minX && p.x < el.maxX && p.z > el.minZ && p.z < el.maxZ
-  ) {
+  if (p.ground === "deck" && w.stats.elevator && w.progress.highestRest >= 0 && p.x > el.minX && p.x < el.maxX && p.z > el.minZ && p.z < el.maxZ) {
     const f = Math.min(w.progress.highestRest, tower.rests.length - 2);
-    const y = tower.rests[f];
-    Object.assign(p, newPlayer(-RING_SPAWN, y, 0));
-    run.startY = y;
-    run.maxY = y;
+    const spot = tower.restSpots[f];
+    Object.assign(p, newPlayer(spot.x, spot.y, spot.z));
+    run.startY = spot.y;
+    run.maxY = spot.y;
     run.floor = f + 1;
     run.refilled.push(f); // ya está descansado
     events.push({ type: "elevator", floor: f });
@@ -511,13 +694,16 @@ function checkPlaces(w: World, events: SimEvent[]) {
 }
 
 export function summarize(w: World): RunSummary {
-  const { run, progress } = w;
+  const { run, progress, stats } = w;
   const height = Math.max(0, run.maxY);
   const climbed = Math.max(0, run.maxY - run.startY);
   const record = height > progress.record + 0.05;
   const recordFame = record ? Math.round((height - progress.record) * RECORD_FAME_PER_M) : 0;
   const heightFame = Math.round(climbed);
   const itemsFame = run.bag.reduce((sum, item) => sum + item.value, 0) + (run.reachedTop ? TOP_BONUS : 0);
+  const base = heightFame + recordFame + run.chips + itemsFame;
+  const multiplier = stats.fameMult * (w.modifier === "fame2" ? 2 : 1);
+  const bonusFame = Math.round(base * (multiplier - 1));
   return {
     height: Math.round(height * 10) / 10,
     climbed: Math.round(climbed * 10) / 10,
@@ -527,7 +713,8 @@ export function summarize(w: World): RunSummary {
     chips: run.chips,
     items: [...run.bag],
     itemsFame,
-    total: heightFame + recordFame + run.chips + itemsFame,
+    bonusFame,
+    total: base + bonusFame,
   };
 }
 
@@ -539,6 +726,7 @@ function splash(w: World, events: SimEvent[]) {
   w.phaseTime = 0;
   w.player.vx *= 0.2;
   w.player.vz *= 0.2;
+  w.player.climbing = false;
   events.push({ type: "splash", summary, x: w.player.x, z: w.player.z });
 }
 
@@ -546,7 +734,7 @@ function respawn(w: World, events: SimEvent[]) {
   const { start } = w.tower;
   w.player = newPlayer(start.x, start.y, start.z);
   w.energy = w.stats.energy;
-  w.run = newRun(w.tower, w.seed, w.run.number + 1, start.y);
+  w.run = newRun(w.tower, w.seed, w.run.number + 1, start.y, w.modifier);
   w.phase = "playing";
   w.phaseTime = 0;
   events.push({ type: "respawn" });
@@ -555,7 +743,7 @@ function respawn(w: World, events: SimEvent[]) {
 /** Cambiar mejoras entre intentos (o en la orilla): la energía se llena. */
 export function applyStats(w: World, stats: Stats) {
   w.stats = stats;
-  if (onSafeGround(w.player)) w.energy = stats.energy;
+  if (w.player.safe) w.energy = stats.energy;
 }
 
 export const IDLE_INPUT = IDLE;
@@ -566,7 +754,7 @@ export function groundBelow(w: World, x: number, z: number, y: number): number {
   let best: number = TUNING.waterY;
   const r = TUNING.playerRadius * 0.5;
   for (const b of w.tower.blocks) {
-    if (b.maxY > y + 0.05 || b.maxY <= best) continue;
+    if (b.maxY > y + 0.05 || b.maxY <= best || b.kind === "wall" || !solidNow(w, b)) continue;
     if (x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ) best = b.maxY;
   }
   for (const m of w.tower.movers) {

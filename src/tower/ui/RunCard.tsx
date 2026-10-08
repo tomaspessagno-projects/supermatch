@@ -39,6 +39,7 @@ export function RunCard() {
     ...(run.record ? ([["¡Récord nuevo!", run.recordFame]] as [string, number][]) : []),
     ["Fichas", run.chips],
   ];
+  const bonus: [string, number][] = run.bonusFame > 0 ? [["Bonus (temporada, mascota, evento)", run.bonusFame]] : [];
 
   return (
     // Centrada con flex: la animación de entrada usa `translate` y pisaría un -translate-x.
@@ -66,6 +67,12 @@ export function RunCard() {
             </li>
           );
         })}
+        {bonus.map(([label, value]) => (
+          <li key={label} className="flex justify-between">
+            <span className="text-rubber">{label}</span>
+            <span className="font-display text-sun">+{value}</span>
+          </li>
+        ))}
       </ul>
       <p className="mt-2 flex items-baseline justify-between border-t-2 border-dashed border-white/20 pt-2">
         <span className="text-cartoon text-xl text-white">TOTAL</span>

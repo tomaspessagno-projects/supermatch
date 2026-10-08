@@ -1,14 +1,25 @@
 "use client";
 
-import { useTower } from "../store";
+import type { LiveEvent } from "../sim/events";
 import { buildTower } from "../sim/level";
+import { seasonMultiplier } from "../sim/progression";
+import { useTower } from "../store";
 
 const FLOORS = buildTower().floors;
 
-/** Marcador: fama, altura y récord, energía y mochila. */
-export function Hud({ muted, onMute }: { muted: boolean; onMute: () => void }) {
+const clock = (ms: number) => {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+export type LiveState = { event: LiveEvent | null; endsAt: number; next: LiveEvent; startsAt: number; now: number };
+
+/** Marcador: fama, altura y récord, energía y mochila, y el evento en vivo. */
+export function Hud({ muted, onMute, live }: { muted: boolean; onMute: () => void; live: LiveState | null }) {
   const fame = useTower((s) => s.fame);
   const record = useTower((s) => s.record);
+  const season = useTower((s) => s.season);
+  const runs = useTower((s) => s.runs);
   const hud = useTower((s) => s.hud);
   const openPanel = useTower((s) => s.openPanel);
   const energy = hud.energyMax ? hud.energy / hud.energyMax : 0;
@@ -20,8 +31,13 @@ export function Hud({ muted, onMute }: { muted: boolean; onMute: () => void }) {
         <div className="flex flex-col">
           <span className="font-display text-xs text-foreground/80 sm:text-sm">FAMA</span>
           <span className="text-cartoon text-3xl text-sun tabular-nums sm:text-4xl" data-testid="fame">
-            ⭐ {fame.toLocaleString("es-AR")}
+            ⭐ {Math.floor(fame).toLocaleString("es-AR")}
           </span>
+          {season > 0 && (
+            <span className="font-display text-xs text-rubber" data-testid="season-badge">
+              TEMPORADA {season + 1} · ×{seasonMultiplier(season).toLocaleString("es-AR")}
+            </span>
+          )}
           {hud.chips > 0 && <span className="font-display text-sm text-water">+{hud.chips} en este intento</span>}
         </div>
         <div className="flex flex-col items-center text-center">
@@ -31,6 +47,15 @@ export function Hud({ muted, onMute }: { muted: boolean; onMute: () => void }) {
           <span className="font-display text-xs text-foreground/80 sm:text-sm">
             RÉCORD {record.toFixed(1)} m · PISO {hud.floor + 1}: {floor.name.toUpperCase()}
           </span>
+          {live?.event ? (
+            <span className="mt-1 animate-pulse rounded-full border-2 border-ink bg-sun px-3 py-0.5 font-display text-sm text-ink" data-testid="live-event">
+              {live.event.emoji} {live.event.name.toUpperCase()} · {clock(live.endsAt - live.now)}
+            </span>
+          ) : live ? (
+            <span className="mt-1 font-display text-[11px] text-foreground/60">
+              PRÓXIMO EVENTO: {live.next.emoji} EN {clock(live.startsAt - live.now)}
+            </span>
+          ) : null}
         </div>
         <div className="pointer-events-auto flex gap-2">
           <HudButton label="Colección" onClick={() => openPanel("collection")} testId="open-collection">
@@ -62,6 +87,11 @@ export function Hud({ muted, onMute }: { muted: boolean; onMute: () => void }) {
         </span>
       </div>
 
+      {runs < 2 && hud.onDeck && !hud.nearKiosk && (
+        <p className="pointer-events-none absolute bottom-24 left-1/2 z-10 w-max max-w-[92vw] -translate-x-1/2 rounded-2xl border-4 border-ink bg-ink/70 px-4 py-2 text-center font-display text-sm text-white pointer-coarse:hidden">
+          ⬅️ ➡️ moverte · ⬆️ hacia la torre (y trepar redes) · ESPACIO saltar · arrastrá para mirar
+        </p>
+      )}
       {hud.nearKiosk && (
         <button
           type="button"

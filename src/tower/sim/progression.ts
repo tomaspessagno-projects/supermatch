@@ -38,7 +38,26 @@ export function upgradeCost(id: UpgradeId, level: number): number | null {
   return Math.round(def.base * def.growth ** level);
 }
 
-/** Lo que la simulación necesita saber de las mejoras. */
+/** Mascotas: te siguen y te dan un bonus. Se compran una vez; se lleva una sola. */
+export type PetId = "duck" | "dog" | "cloud" | "octopus" | "dragon";
+
+export type PetDef = { id: PetId; name: string; detail: string; emoji: string; price: number };
+
+export const PETS: readonly PetDef[] = [
+  { id: "duck", name: "Patito", detail: "Las fichas valen 50 % más", emoji: "🐥", price: 400 },
+  { id: "dog", name: "Perrito", detail: "Te trae fichas y regalos desde lejos", emoji: "🐶", price: 900 },
+  { id: "cloud", name: "Nubecita", detail: "Gastás 25 % menos energía", emoji: "☁️", price: 1500 },
+  { id: "octopus", name: "Pulpito", detail: "3 lugares más en la mochila", emoji: "🐙", price: 2500 },
+  { id: "dragon", name: "Dragoncito", detail: "Toda la fama ×1,5", emoji: "🐲", price: 6000 },
+];
+
+export const petDef = (id: PetId) => PETS.find((p) => p.id === id)!;
+
+/** Cada temporada nueva suma 50 % de fama para siempre. */
+export const SEASON_BONUS = 0.5;
+export const seasonMultiplier = (season: number) => 1 + SEASON_BONUS * season;
+
+/** Lo que la simulación necesita saber de las mejoras, la mascota y la temporada. */
 export type Stats = {
   jumpSpeed: number;
   energy: number;
@@ -48,22 +67,31 @@ export type Stats = {
   doubleJump: boolean;
   float: boolean;
   elevator: boolean;
+  /** Multiplica el valor de las fichas. */
+  chipMult: number;
+  /** Multiplica la fama total del intento. */
+  fameMult: number;
+  /** Multiplica el gasto de energía. */
+  drainMult: number;
 };
 
-export const ENERGY_BASE = 30;
-export const ENERGY_PER_LEVEL = 8;
+export const ENERGY_BASE = 40;
+export const ENERGY_PER_LEVEL = 10;
 export const JUMP_PER_LEVEL = 0.45;
 
-export function statsFor(levels: Levels): Stats {
+export function statsFor(levels: Levels, pet: PetId | null = null, season = 0): Stats {
   return {
     jumpSpeed: TUNING.jumpSpeed + JUMP_PER_LEVEL * levels.jump,
     energy: ENERGY_BASE + ENERGY_PER_LEVEL * levels.energy,
     grip: levels.grip,
-    bag: 3 + 2 * levels.bag,
-    pickRadius: TUNING.pickRadius + 0.6 * levels.magnet,
+    bag: 3 + 2 * levels.bag + (pet === "octopus" ? 3 : 0),
+    pickRadius: TUNING.pickRadius + 0.6 * levels.magnet + (pet === "dog" ? 1.2 : 0),
     doubleJump: levels.double > 0,
     float: levels.float > 0,
     elevator: levels.elevator > 0,
+    chipMult: pet === "duck" ? 1.5 : 1,
+    fameMult: seasonMultiplier(season) * (pet === "dragon" ? 1.5 : 1),
+    drainMult: pet === "cloud" ? 0.75 : 1,
   };
 }
 

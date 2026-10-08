@@ -3,6 +3,7 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { liveEventAt } from "../sim/events";
 import { buildTower } from "../sim/level";
 import { applyStats, createWorld, type SimEvent, step } from "../sim/sim";
 import { useTower } from "../store";
@@ -10,26 +11,30 @@ import { bus } from "./bus";
 import { Effects } from "./Effects";
 import { type Frame, playerPosition } from "./frame";
 import { input } from "./input";
+import { Pet } from "./Pet";
 import { Player } from "./Player";
 import { play } from "./sfx";
 import { Stage } from "./Stage";
 import { Tower } from "./Tower";
 
 const STEP = 1 / 120;
-const CAMERA_DISTANCE = 8.5;
-const CAMERA_HEIGHT = 3.4;
+const CAMERA_DISTANCE = 11;
+const CAMERA_HEIGHT = 3.6;
 
+/** Lo que dice el presentador al entrar a cada piso. */
 const FLOOR_LINES: Record<number, string> = {
-  1: "¡Piso 2: el jabón! Ojo que ahí no se frena...",
-  2: "¡Piso 3: el viento! Cuando sopla, te lleva para afuera.",
-  3: "¡Piso 4: las barredoras! Esperá el momento justo.",
-  4: "¡Piso 5: las burbujas! Rebotan solas, aprovechalas.",
-  5: "¡Piso 6: las nubes! Se mueven... ¡y arriba está la Copa!",
+  1: "¡Piso 2: jabón y cintas! En el jabón no se frena, y las cintas te llevan.",
+  2: "¡Piso 3: camas elásticas! Saltá justo al caer y volás. Ojo: las naranjas se desinflan.",
+  3: "¡Piso 4: las bolas rojas! Son redondas: caé en el medio. Y cuidado con los ventiladores.",
+  4: "¡Piso 5: martillos y guantes! Mirá el ritmo antes de pasar.",
+  5: "¡Piso 6: redes y cañones! En la red, apretá para adelante y trepás.",
+  6: "¡Piso 7: géiseres! Quedate en el chorro hasta arriba de todo y después saltá.",
+  7: "¡Piso 8: nubes y calesitas! Las celestes titilan antes de desaparecer... ¡y arriba está la Copa!",
 };
 
 const angleDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
-type LoopState = { acc: number; hudAt: number; yaw: number; ready: boolean; look: THREE.Vector3; fwd: THREE.Vector3 };
+type LoopState = { acc: number; hudAt: number; yaw: number; lead: number; ready: boolean; look: THREE.Vector3; fwd: THREE.Vector3 };
 
 /** Un cuadro: teclas → simulación en pasos fijos → cámara → HUD. */
 function advance(f: Frame, c: LoopState, camera: THREE.Camera, delta: number, onEvents: (e: readonly SimEvent[]) => void) {
@@ -37,8 +42,10 @@ function advance(f: Frame, c: LoopState, camera: THREE.Camera, delta: number, on
   f.clock += dt;
   const w = f.world;
   const panelOpen = useTower.getState().panel !== null;
+  // El evento en vivo lo elige el reloj (igual para todos).
+  w.modifier = liveEventAt(Date.now())?.event.id ?? null;
 
-  // Para adelante = hacia donde mira la cámara (en el piso).
+  // Para adelante = hacia donde mira la cámara (en el piso): hacia la torre.
   camera.getWorldDirection(c.fwd);
   c.fwd.y = 0;
   c.fwd.normalize();
@@ -57,33 +64,35 @@ function advance(f: Frame, c: LoopState, camera: THREE.Camera, delta: number, on
   }
   f.alpha = c.acc / STEP;
 
-  // Cámara: afuera de la torre, del lado del jugador, mirándolo contra la torre.
+  // Cámara: siempre de frente a la torre (no da vueltas); sigue al jugador de
+  // costado y para arriba, mirando un poco hacia donde va.
   const pos = playerPosition(f);
-  const d = Math.hypot(pos.x, pos.z);
-  const around = d > 0.5 ? Math.atan2(pos.x, pos.z) : c.yaw;
-  const targetYaw = around + input.yaw;
+  const targetYaw = input.yaw;
   if (!c.ready) c.yaw = targetYaw;
-  c.yaw += angleDiff(targetYaw, c.yaw) * (1 - Math.exp(-dt * 3.5));
-  // En pantallas angostas (celular parado) se abre el lente y se aleja, para ver los escalones de al lado.
+  c.yaw += angleDiff(targetYaw, c.yaw) * (1 - Math.exp(-dt * 5));
+  const lead = Math.max(-1.6, Math.min(1.6, w.player.vx * 0.3));
+  c.lead += (lead - c.lead) * (1 - Math.exp(-dt * 2));
+  // En pantallas angostas (celular parado) se abre el lente y se aleja.
   const lens = camera as THREE.PerspectiveCamera;
   const narrow = Math.max(0, 1 - lens.aspect);
-  const fov = 55 + narrow * 30;
+  const fov = 55 + narrow * 28;
   if (Math.abs(lens.fov - fov) > 0.1) {
     lens.fov = fov;
     lens.updateProjectionMatrix();
   }
-  const distance = CAMERA_DISTANCE * (1 + narrow * 0.6);
-  const height = (CAMERA_HEIGHT + input.pitch * 4) * (1 + narrow * 0.4);
-  const desired = new THREE.Vector3(pos.x + Math.sin(c.yaw) * distance, pos.y + height, pos.z + Math.cos(c.yaw) * distance);
-  const look = new THREE.Vector3(pos.x, pos.y + 1.1, pos.z);
+  const distance = CAMERA_DISTANCE * (1 + narrow * 0.5);
+  const height = (CAMERA_HEIGHT + input.pitch * 4) * (1 + narrow * 0.3);
+  const lookX = pos.x + c.lead;
+  const desired = new THREE.Vector3(lookX + Math.sin(c.yaw) * distance, pos.y + height, pos.z + Math.cos(c.yaw) * distance);
+  const look = new THREE.Vector3(lookX, pos.y + 1.3, pos.z - 0.4);
   if (!c.ready) {
     camera.position.copy(desired);
     c.look.copy(look);
     c.ready = true;
   }
   if (w.phase !== "splash") {
-    camera.position.lerp(desired, 1 - Math.exp(-dt * 6));
-    c.look.lerp(look, 1 - Math.exp(-dt * 10));
+    camera.position.lerp(desired, 1 - Math.exp(-dt * 5));
+    c.look.lerp(look, 1 - Math.exp(-dt * 9));
   }
   camera.lookAt(c.look);
 
@@ -113,7 +122,7 @@ function advance(f: Frame, c: LoopState, camera: THREE.Camera, delta: number, on
 /** El bucle: corre antes que todo lo demás en cada cuadro. */
 function Loop({ frame, onEvents }: { frame: React.RefObject<Frame | null>; onEvents: (e: readonly SimEvent[]) => void }) {
   // Estado del bucle (mutable, fuera de React).
-  const loop = useRef<LoopState>({ acc: 0, hudAt: 0, yaw: -Math.PI / 2, ready: false, look: new THREE.Vector3(), fwd: new THREE.Vector3() });
+  const loop = useRef<LoopState>({ acc: 0, hudAt: 0, yaw: 0, lead: 0, ready: false, look: new THREE.Vector3(), fwd: new THREE.Vector3() });
   useFrame((state, delta) => {
     if (frame.current) advance(frame.current, loop.current, state.camera, delta, onEvents);
   }, -1);
@@ -129,7 +138,7 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
   useEffect(() => {
     const s = useTower.getState();
     frame.current = {
-      world: createWorld(tower, s.stats(), { record: s.record, highestRest: s.highestRest }, Math.floor(Math.random() * 1e9)),
+      world: createWorld(tower, s.stats(), { record: s.record, highestRest: s.highestRest }, Math.floor(Math.random() * 1e9), liveEventAt(Date.now())?.event.id ?? null),
       prev: { x: tower.start.x, y: tower.start.y, z: tower.start.z },
       alpha: 0,
       clock: 0,
@@ -138,11 +147,14 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
     if (new URLSearchParams(window.location.search).has("debug")) Object.assign(window, { __torre: frame });
   }, [tower]);
 
-  // Comprar en el kiosco cambia el personaje enseguida (está en la orilla).
+  // Comprar en el kiosco (o cambiar de mascota, o de temporada) cambia el personaje enseguida.
   useEffect(
     () =>
       useTower.subscribe((state, prev) => {
-        if (state.levels !== prev.levels && frame.current) applyStats(frame.current.world, state.stats());
+        if (!frame.current) return;
+        if (state.levels !== prev.levels || state.pet !== prev.pet || state.season !== prev.season) applyStats(frame.current.world, state.stats());
+        // Nueva temporada: el récord y los descansos vuelven a cero.
+        if (state.season !== prev.season) Object.assign(frame.current.world.progress, { record: state.record, highestRest: state.highestRest });
       }),
     [],
   );
@@ -165,10 +177,21 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
           if (e.impact > 8) play("land", { volume: Math.min(1, e.impact / 25), vary: 2 });
           break;
         case "bounce":
-          play("spring", { vary: 1 });
+          play("spring", { vary: 1, volume: e.big ? 1 : 0.8 });
+          if (e.big) play("cheer", { volume: 0.4 });
           break;
         case "knock":
-          play("bonk", { vary: 1 });
+          play(e.by === "cannon" ? "cannon" : "bonk", { vary: 1 });
+          if (e.by === "piston") play("laugh", { volume: 0.5, vary: 1 });
+          break;
+        case "deflate":
+          play("creak", { vary: 2, volume: 0.7 });
+          break;
+        case "lift":
+          play("splash", { vary: 2, volume: 0.5 });
+          break;
+        case "mantle":
+          play("land", { volume: 0.4, vary: 2 });
           break;
         case "chip":
           play("pop", { vary: 3, volume: 0.6 });
@@ -203,19 +226,18 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
         case "top":
           play("finish");
           play("cheer");
-          store.announce("¡LLEGÓ A LA CIMA! ¡La Copa Supermatch es tuya! ¡Qué temporada!");
+          store.announce("¡LLEGÓ A LA CIMA! ¡La Copa Supermatch es tuya! En el kiosco ya podés empezar una temporada nueva.");
           break;
         case "elevator":
           play("spring");
           break;
-        case "splash": {
+        case "splash":
           play("splash", { vary: 1 });
           play("laugh", { vary: 1, volume: 0.7 });
           // Caerse del muelle sin subir nada no es un intento: solo una risa.
-          if (e.summary.climbed < 0.5 && e.summary.total === 0) store.announce("¡Ups! La torre está para el otro lado. Caminá derecho y saltá al primer escalón.");
+          if (e.summary.climbed < 0.5 && e.summary.total === 0) store.announce("¡Ups! La torre está para la derecha. Caminá y saltá al primer escalón.");
           else store.finishRun(e.summary);
           break;
-        }
         case "respawn":
           bagWarned.current = false;
           applyStats(w, store.stats());
@@ -228,7 +250,7 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
     <Canvas
       shadows
       dpr={[1, 1.75]}
-      camera={{ fov: 55, near: 0.1, far: 300, position: [-20, 4, 0] }}
+      camera={{ fov: 55, near: 0.1, far: 300, position: [-17, 4, 14] }}
       gl={{ antialias: true, powerPreference: "high-performance" }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -239,6 +261,7 @@ export function TowerCanvas({ teamColor }: { teamColor: string }) {
         <Stage frame={frame} />
         <Tower tower={tower} frame={frame} />
         <Player frame={frame} teamColor={teamColor} />
+        <Pet frame={frame} />
         <Effects frame={frame} />
       </Suspense>
     </Canvas>

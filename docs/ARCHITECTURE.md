@@ -10,8 +10,10 @@ archivo.
 |---|---|
 | 3D | **three.js** 0.186 con **@react-three/fiber** 9 y **@react-three/drei** 10 |
 | Estilo | Toon: `MeshToonMaterial` con un degradé de 3 tonos + contornos de tinta (`Outlines` de drei) |
+| Cámara | Fija de frente a la fachada (la versión en espiral mareaba) |
 | Física | **Simulación propia**: TypeScript puro, determinista, paso fijo de 120 Hz, cajas alineadas a los ejes. Sin motor de física |
-| Progreso | Zustand con `persist` en `localStorage` (clave `supermatch:torre`). A Supabase en la fase 2 |
+| Progreso | Zustand con `persist` en `localStorage` (clave `supermatch:torre`): fama, mejoras, mascotas, temporada, récord, colección. A Supabase en la fase 2 |
+| Eventos en vivo | Por reloj (cada 5 min, 90 s): iguales para todos sin servidor |
 | Facción | **Bloqueada** una vez elegida (en el store y en la base) |
 | Auth | Supabase Anonymous Sign-in |
 | Ranking y misiones | `team_totals` y `today_missions` (por ahora no reciben puntos de La Torre) |
@@ -59,50 +61,79 @@ src/
 ├── store/session.ts          Perfil: equipo y apodo
 └── tower/
     ├── sim/                  TypeScript puro + tests
-    │   ├── tuning.ts         Todos los números del movimiento
-    │   ├── level.ts          buildTower(seed): bloques, camino, obstáculos, cornisas
+    │   ├── tuning.ts         Todos los números del movimiento y las mecánicas
+    │   ├── level.ts          buildTower(seed): fachada, camino en zigzag, mecánicas por piso
     │   ├── items.ts          Objetos, rarezas, mutaciones
-    │   ├── progression.ts    Mejoras del kiosco, precios y stats
+    │   ├── progression.ts    Mejoras, mascotas, temporadas y stats
+    │   ├── events.ts         Eventos en vivo (elegidos por el reloj)
     │   ├── sim.ts            createWorld / step / summarize / applyStats
     │   └── autopilot.ts      Piloto automático para los tests de alcance
-    ├── store.ts              Fama, mejoras, récord, colección (persistido)
+    ├── store.ts              Fama, mejoras, mascotas, temporada, récord, colección (persistido)
     ├── view/                 three.js (solo dibuja y suena)
-    │   ├── TowerCanvas.tsx   <Canvas>, bucle, cámara, eventos → sonido/store
+    │   ├── TowerCanvas.tsx   <Canvas>, bucle, cámara, evento en vivo, eventos → sonido/store
     │   ├── Player.tsx        Concursante procedural (grupos articulados)
-    │   ├── Tower.tsx         Bloques instanciados, columna, obstáculos, regalos, carteles
+    │   ├── Pet.tsx           La mascota que te sigue
+    │   ├── Tower.tsx         Junta todo + fichas, regalos y el muelle
+    │   ├── tower/            Facade (fachada, corona, carteles), Blocks (estáticos),
+    │   │                     Dynamic (se desinflan, titilan, giran), Hazards (lo que te tira)
     │   ├── Stage.tsx         Pileta, estudio, reflectores, luces
     │   ├── Effects.tsx       Partículas y carteles flotantes
     │   ├── toon.ts           Paleta, materiales toon cacheados
     │   ├── input.ts  bus.ts  frame.ts  sfx.ts
-    └── ui/                   HUD, tarjeta del intento, kiosco, colección, joystick
+    └── ui/                   HUD (con el evento en vivo), tarjeta del intento,
+                              kiosco (mejoras, mascotas, temporada), colección, joystick
 ```
 
 ## La simulación
 
-- **Mundo:** cajas (`Box`) alineadas a los ejes. El jugador es un cilindro (radio 0,35,
-  alto 1,6) para la columna y una caja para los bloques.
+- **Mundo:** cajas (`Box`) alineadas a los ejes: x a lo largo de la fachada, y para
+  arriba, z hacia afuera (la pileta y la cámara). La fachada es un bloque más (no se
+  atraviesa). El jugador es una caja de 0,7 × 1,6.
+- **Nivel:** el camino sube en zigzag de un costado al otro; en cada vuelta cambia de
+  carril (z ≈ 1,5 o ≈ 4,7) y de sentido. Los descansos ocupan todo su carril; si quedan
+  en una punta, dan la vuelta (otro sentido y otro carril). Cada piso tiene su lista de
+  especiales en ronda; los que lanzan (cama elástica, géiser, burbuja) y las redes solo
+  van si después queda lugar en el piso, y después de un lanzamiento el hueco es más
+  grande para no darse la cabeza.
 - **Colisiones** por eje y con la posición anterior: solo aterriza si en el paso anterior
   estaba por encima del bloque; solo golpea el techo si estaba por debajo; de costado solo
   si antes estaba afuera. Eso evita "teletransportes" cuando un salto roza una esquina.
-- **Suelos:** normal, jabón (aceleración y frenado bajos), burbuja (rebote), descanso
-  (recarga), nube (te lleva), orilla y ascensor.
-- **Obstáculos:** barredoras y nubes son `Mover` con movimiento senoidal en función del
-  tiempo (`moverBox(m, t)`); el viento es una caja que, mientras sopla, suma una deriva
-  de velocidad hacia afuera (menor si estás parado).
-- **Energía:** baja con el tiempo y con cada salto, salvo en lugares seguros (`safe`:
-  la orilla y los descansos). Sin energía, al rato te resbalás para afuera.
-- **Intento:** al tocar el agua, `summarize` calcula la fama y aparece `splash`; a los
-  1,6 s, `respawn` en la orilla (o en el descanso más alto con el Ascensor).
-- **Determinismo:** misma semilla y mismos inputs = mismo resultado (hay test).
-- **Tests de alcance:** `level.test.ts` sube cada piso con el piloto automático sobre la
-  simulación real y verifica qué nivel de Salto pide cada uno.
+- **Suelos:** normal, jabón (aceleración y frenado bajos), cinta (te corre en x), cama
+  elástica y burbuja (rebote; con el salto apretado al caer, ×1,22), bola (resbalosa y
+  te empuja para afuera del centro), calesita (te gira alrededor del centro),
+  desinflable (a los 0,55 s de pisarla deja de ser sólida por 2,6 s; el estado vive en
+  `world.crumbles`), parpadeante (sólida un 68 % del ciclo), columna (con red y baranda
+  atrás), descanso, cima, orilla y ascensor.
+- **Lo que te tira:** barredoras, martillos (péndulo: la cabeza sube en las puntas) y
+  guantes (salen rápido de la pared, esperan y vuelven) son `Mover`; `moverBox(m, t)` da
+  dónde están y `moverVelocity` para dónde van. Los cañones tiran pelotas en línea recta
+  (`cannonBall(c, t)`). Todo es función del tiempo: no hay estado.
+- **Redes:** dentro de la zona de la red y apretando hacia la pared, se trepa (sin
+  gravedad, gasta más energía); cerca de arriba, un saltito para adentro te deja sobre
+  la columna. Saltando te soltás para atrás (y por 0,35 s no te agarrás).
+- **Géiseres y ventiladores:** zonas que, mientras están activas, te suben (velocidad
+  mínima hacia arriba) o te arrastran (deriva de velocidad, menor si estás parado).
+- **Eventos en vivo:** `world.modifier` (lo pone la vista según el reloj) cambia la
+  gravedad, el valor de las fichas, la fama total o lo que se sortea al empezar el
+  intento.
+- **Energía:** baja con el tiempo y con cada salto (multiplicado por la mascota), salvo
+  en lugares seguros (`safe`: la orilla y los descansos). Sin energía, al rato te
+  resbalás hacia la pileta.
+- **Intento:** al tocar el agua, `summarize` calcula la fama (con el bonus de temporada,
+  mascota y evento) y aparece `splash`; a los 1,6 s, `respawn` en la orilla (o en el
+  descanso más alto con el Ascensor).
+- **Determinismo:** misma semilla, mismos inputs y mismo evento = mismo resultado.
+- **Tests de alcance:** `level.test.ts` sube cada paso del camino con el piloto
+  automático sobre la simulación real (sin lo que empuja) y verifica qué nivel de Salto
+  pide cada piso, que no haya techos sobre el camino ni bloques encimados.
 
 ### Cómo ajustar el feel
 
-Todo está en `sim/tuning.ts` (gravedad, velocidades, aceleraciones en el piso, en el aire
-y en el jabón, salto, coyote time, energía, viento, barredoras) y en `FLOOR_DEFS` de
-`level.ts` (subida, giro y tamaño de los escalones de cada piso). Después de tocar algo:
-`npm test` dice si algún piso dejó de poder subirse o pasó a ser trivial.
+Todo está en `sim/tuning.ts` (gravedad, velocidades, aceleraciones en el piso, en el aire,
+en el jabón y en las bolas, salto, rebotes, redes, géiseres, golpes, energía) y en
+`FLOOR_DEFS` de `level.ts` (alto, subidas comunes y altas, huecos, tamaños y la ronda de
+especiales de cada piso). Después de tocar algo: `npm test` dice si algún piso dejó de
+poder subirse o pasó a ser trivial.
 
 ## Render
 
@@ -111,10 +142,14 @@ y en el jabón, salto, coyote time, energía, viento, barredoras) y en `FLOOR_DE
 - El bucle corre en `useFrame` con prioridad -1 (antes que todo lo demás) y vive en una
   función de módulo (`advance`) para no chocar con las reglas del compilador de React
   (no se pueden mutar props ni valores de hooks dentro de un componente).
-- Bloques: un `InstancedMesh` por tipo con `RoundedBoxGeometry` de 1×1×1 escalada por
-  instancia, colores por instancia y contorno.
-- Cámara: afuera de la torre, del lado del jugador, mirándolo contra la columna; se
-  suaviza con `1 - exp(-dt·k)`. Arrastrar gira (`input.yaw/pitch`).
+- Bloques fijos: un `InstancedMesh` por tipo con `RoundedBoxGeometry` de 1×1×1 escalada
+  por instancia, colores por instancia y contorno. Los que cambian (desinflables,
+  parpadeantes, calesitas) son mallas sueltas que leen el mundo en cada cuadro.
+- Cámara: **siempre de frente** (sin giros, para no marear); sigue al jugador en x e y,
+  mira un poco hacia donde va y se suaviza con `1 - exp(-dt·k)`. Arrastrar deja espiar
+  de costado (`input.yaw/pitch`). El fondo del estudio sube con la cámara.
+- La luz principal viene de adelante y arriba: la sombra de cada plataforma cae sobre la
+  fachada, y eso ayuda mucho a leer la profundidad.
 - Con `?debug` en la URL queda `window.__torre` (el `Frame`) para las pruebas e2e.
 
 ## Infraestructura
@@ -147,6 +182,9 @@ cliente pasa por RLS o por RPC.
   render se integran en pasos de 1/120 s.
 - `Text` de drei (troika) baja fuentes de un CDN si un carácter no está en la fuente
   (por ejemplo un emoji). Los textos 3D usan solo letras que tiene Luckiest Guy.
+- `Outlines` de drei es una cáscara opaca: si la malla se vuelve transparente, la
+  cáscara se ve como una mancha oscura. Lo que se desvanece (las parpadeantes) usa otra
+  malla sin contorno para el estado "fantasma".
 - `THREE.Clock` está deprecado (aviso de consola que viene de fiber) y
   `PCFSoftShadowMap` cae a `PCFShadowMap`: son avisos inofensivos.
 

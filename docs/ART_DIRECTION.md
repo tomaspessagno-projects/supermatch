@@ -4,14 +4,14 @@
 
 **Toon con bloques:** formas redondeadas y simples, colores saturados planos, sombreado
 en 3 tonos (`MeshToonMaterial` con un degradé) y contorno de tinta `#1F1147`. Todo lo
-que se ve hoy es geometría hecha por código (bloques, columna a rayas, nubes, burbujas,
-regalos), salvo el fondo del estudio (`public/game/sprites/bg-studio.jpg`) y la fuente.
+que se ve hoy es geometría hecha por código (la fachada inflable, plataformas, bolas,
+martillos, guantes, cañones, géiseres, nubes, calesitas, mascotas, regalos), salvo el fondo del estudio (`public/game/sprites/bg-studio.jpg`) y la fuente.
 
 | Uso | Color |
 |---|---|
 | Tinta / contornos | `#1F1147` |
 | Agua | `#22D3EE` |
-| Columna | rosa `#F472B6` y blanco a rayas |
+| Fachada | una franja pastel por piso; tubos de los bordes rosa `#F472B6` y blanco |
 | Escalones | rosa, cian, amarillo, violeta, rojo, blanco |
 | Jabón | `#E0F2FE` con espuma |
 | Cima | dorado `#FBBF24` |

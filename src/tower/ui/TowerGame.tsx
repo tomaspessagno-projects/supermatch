@@ -7,11 +7,12 @@ import { useEffect, useRef, useState } from "react";
 import { Host } from "@/components/Host";
 import { getTeam } from "@/lib/teams";
 import { useSession } from "@/store/session";
+import { liveEventAt, nextEventAt } from "../sim/events";
 import { useTower } from "../store";
 import { input, listenKeyboard } from "../view/input";
-import { setMuted, stopAudio, unlockAudio } from "../view/sfx";
+import { play, setMuted, stopAudio, unlockAudio } from "../view/sfx";
 import { CollectionPanel } from "./CollectionPanel";
-import { Hud } from "./Hud";
+import { Hud, type LiveState } from "./Hud";
 import { RunCard } from "./RunCard";
 import { Shop } from "./Shop";
 import { TouchPad } from "./TouchPad";
@@ -40,6 +41,7 @@ export function TowerGame() {
     }
   });
   const [hiddenId, setHiddenId] = useState(0);
+  const [live, setLive] = useState<LiveState | null>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -70,6 +72,27 @@ export function TowerGame() {
   }, []);
 
   useEffect(() => setMuted(muted), [muted]);
+
+  // Eventos en vivo: el reloj dice cuál está pasando (igual para todos).
+  useEffect(() => {
+    const tick = () => {
+      const now = Date.now();
+      const current = liveEventAt(now);
+      const next = nextEventAt(now);
+      setLive({ event: current?.event ?? null, endsAt: current?.endsAt ?? 0, next: next.event, startsAt: next.startsAt, now });
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const eventId = live?.event?.id ?? null;
+  useEffect(() => {
+    if (!eventId || !live?.event) return;
+    useTower.getState().announce(`¡EVENTO EN VIVO! ${live.event.name} ${live.event.detail}. ¡Aprovechalo!`);
+    play("whistle", { volume: 0.6 });
+    // Solo cuando cambia el evento.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId]);
 
   // El presentador habla unos segundos y se va.
   useEffect(() => {
@@ -112,7 +135,7 @@ export function TowerGame() {
       <div className="absolute inset-0">
         <TowerCanvas teamColor={getTeam(team).color} />
       </div>
-      <Hud muted={muted} onMute={toggleMute} />
+      <Hud muted={muted} onMute={toggleMute} live={live} />
       {line && (
         <div key={line.id} className="pointer-events-none absolute left-3 top-24 z-10 w-[min(92vw,520px)] animate-[card-in_0.4s_ease-out_both] sm:left-4">
           <Host line={line.text} />
@@ -120,7 +143,7 @@ export function TowerGame() {
       )}
       <RunCard />
       <TouchPad />
-      {panel === "shop" && <Shop />}
+      {(panel === "shop" || panel === "pets" || panel === "season") && <Shop />}
       {panel === "collection" && <CollectionPanel />}
       <Link href="/" className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 font-display text-sm text-foreground/60 underline-offset-4 hover:underline pointer-coarse:hidden">
         ← Salir

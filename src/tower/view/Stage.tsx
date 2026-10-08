@@ -60,6 +60,15 @@ function Pool() {
   );
 }
 
+/** El estudio y los reflectores suben con la cámara (la torre es muy alta). */
+function FollowCamera({ children }: { children: React.ReactNode }) {
+  const group = useRef<THREE.Group>(null);
+  useFrame(({ camera }) => {
+    if (group.current) group.current.position.y = Math.max(0, camera.position.y - 20);
+  });
+  return <group ref={group}>{children}</group>;
+}
+
 /** El estudio: la foto del programa envolviendo todo, con niebla. */
 function Backdrop() {
   const texture = useTexture("/game/sprites/bg-studio.jpg", (t) => {
@@ -110,7 +119,8 @@ function Lights({ frame }: { frame: React.RefObject<Frame | null> }) {
     const light = sun.current;
     if (!f || !light) return;
     const p = f.world.player;
-    light.position.set(p.x + 8, p.y + 18, p.z + 6);
+    // De adelante y arriba: la sombra cae sobre la fachada y se entiende la profundidad.
+    light.position.set(p.x + 5, p.y + 16, p.z + 14);
     light.target.position.set(p.x, p.y, p.z);
     light.target.updateMatrixWorld();
   });
@@ -128,7 +138,7 @@ function Lights({ frame }: { frame: React.RefObject<Frame | null> }) {
         shadow-camera-top={14}
         shadow-camera-bottom={-14}
         shadow-camera-near={1}
-        shadow-camera-far={60}
+        shadow-camera-far={50}
         shadow-bias={-0.0008}
       />
       <pointLight position={[0, 40, 0]} intensity={60} distance={90} color="#f9a8d4" />
@@ -142,8 +152,10 @@ export function Stage({ frame }: { frame: React.RefObject<Frame | null> }) {
       <color attach="background" args={["#1a1033"]} />
       <fog attach="fog" args={["#2a1650", 45, 120]} />
       <Lights frame={frame} />
-      <Backdrop />
-      <Spotlights />
+      <FollowCamera>
+        <Backdrop />
+        <Spotlights />
+      </FollowCamera>
       <Pool />
     </>
   );

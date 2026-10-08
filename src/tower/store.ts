@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { Mutation } from "./sim/items";
-import { type Levels, NO_UPGRADES, statsFor, type Stats, upgradeCost, type UpgradeId } from "./sim/progression";
+import { TOWER_TOP } from "./sim/level";
+import { type Levels, NO_UPGRADES, petDef, type PetId, statsFor, type Stats, upgradeCost, type UpgradeId } from "./sim/progression";
 import type { RunSummary } from "./sim/sim";
 
 /**
@@ -20,6 +21,11 @@ type Save = {
   highestRest: number;
   runs: number;
   collection: Collection;
+  /** Mascotas compradas y la que te acompaña. */
+  pets: PetId[];
+  pet: PetId | null;
+  /** Temporadas renacidas (cada una suma fama para siempre). */
+  season: number;
 };
 
 /** Lo que muestra el HUD (lo actualiza el juego unas 10 veces por segundo). */
@@ -35,6 +41,8 @@ export type Hud = {
   nearKiosk: boolean;
 };
 
+export type Panel = "shop" | "pets" | "season" | "collection" | null;
+
 /** Lo que dice el presentador (cambia el id para que se vuelva a mostrar). */
 export type Announcement = { id: number; text: string };
 
@@ -43,17 +51,23 @@ type TowerState = Save & {
   announcement: Announcement | null;
   announce: (text: string) => void;
   lastRun: RunSummary | null;
-  panel: "shop" | "collection" | null;
+  panel: Panel;
   stats: () => Stats;
   finishRun: (summary: RunSummary) => void;
   reachRest: (floor: number) => void;
   buy: (id: UpgradeId) => boolean;
+  buyPet: (id: PetId) => boolean;
+  equipPet: (id: PetId | null) => void;
+  /** ¿Ya llegó a la cima alguna vez en esta temporada? */
+  canRebirth: () => boolean;
+  /** Nueva temporada: vuelve a empezar (mejoras, fama y récord) con más fama para siempre. */
+  rebirth: () => boolean;
   setHud: (hud: Hud) => void;
-  openPanel: (panel: "shop" | "collection" | null) => void;
+  openPanel: (panel: Panel) => void;
   dismissRun: () => void;
 };
 
-const EMPTY: Save = { fame: 0, totalFame: 0, levels: NO_UPGRADES, record: 0, highestRest: -1, runs: 0, collection: {} };
+const EMPTY: Save = { fame: 0, totalFame: 0, levels: NO_UPGRADES, record: 0, highestRest: -1, runs: 0, collection: {}, pets: [], pet: null, season: 0 };
 
 export const useTower = create<TowerState>()(
   persist(
@@ -65,7 +79,7 @@ export const useTower = create<TowerState>()(
       announcement: null,
       announce: (text) => set((s) => ({ announcement: { id: (s.announcement?.id ?? 0) + 1, text } })),
 
-      stats: () => statsFor(get().levels),
+      stats: () => statsFor(get().levels, get().pet, get().season),
 
       finishRun(summary) {
         set((s) => {
@@ -96,6 +110,24 @@ export const useTower = create<TowerState>()(
         return true;
       },
 
+      buyPet(id) {
+        const { pets, fame } = get();
+        const price = petDef(id).price;
+        if (pets.includes(id) || price > fame) return false;
+        set({ fame: fame - price, pets: [...pets, id], pet: id });
+        return true;
+      },
+
+      equipPet: (id) => set((s) => ({ pet: id === null || s.pets.includes(id) ? id : s.pet })),
+
+      canRebirth: () => get().record >= TOWER_TOP - 0.5,
+
+      rebirth() {
+        if (!get().canRebirth()) return false;
+        set((s) => ({ season: s.season + 1, fame: 0, levels: NO_UPGRADES, record: 0, highestRest: -1, panel: null }));
+        return true;
+      },
+
       setHud: (hud) => set({ hud }),
       openPanel: (panel) => set({ panel }),
       dismissRun: () => set({ lastRun: null }),
@@ -113,6 +145,9 @@ export const useTower = create<TowerState>()(
         highestRest: s.highestRest,
         runs: s.runs,
         collection: s.collection,
+        pets: s.pets,
+        pet: s.pet,
+        season: s.season,
       }),
     },
   ),
